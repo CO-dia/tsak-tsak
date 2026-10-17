@@ -1,17 +1,17 @@
 import type { StaticImageData } from "next/image";
 
-import food1 from "@/assets/images/food1.png";
-import food2 from "@/assets/images/food2.png";
-import food3 from "@/assets/images/food3.png";
-import food5 from "@/assets/images/food5.png";
-import traiteur1 from "@/assets/images/traiteur1.png";
-import traiteur2 from "@/assets/images/traiteur2.png";
-import traiteur3 from "@/assets/images/traiteur3.jpg";
-import traiteur4 from "@/assets/images/traiteur4.jpg";
-import traiteur5 from "@/assets/images/traiteur5.jpg";
-import traiteur6 from "@/assets/images/traiteur6.jpg";
-import traiteur7 from "@/assets/images/traiteur7.jpg";
-import traiteur8 from "@/assets/images/traiteur8.jpg";
+import food1 from "@/assets/images/food1.webp";
+import food2 from "@/assets/images/food2.webp";
+import food3 from "@/assets/images/food3.webp";
+import food5 from "@/assets/images/food5.webp";
+import traiteur1 from "@/assets/images/traiteur1.webp";
+import traiteur2 from "@/assets/images/traiteur2.webp";
+import traiteur3 from "@/assets/images/traiteur3.webp";
+import traiteur4 from "@/assets/images/traiteur4.webp";
+import traiteur5 from "@/assets/images/traiteur5.webp";
+import traiteur6 from "@/assets/images/traiteur6.webp";
+import traiteur7 from "@/assets/images/traiteur7.webp";
+import traiteur8 from "@/assets/images/traiteur8.webp";
 import type { Locale } from "@/lib/i18n";
 
 // Réservation en ligne (Libro) de Tsak Tsak Beaubien. Saint-Laurent réserve par téléphone seulement.

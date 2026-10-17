@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Arrow, PageHero } from "@/components/ui";
-import brunchImage from "@/assets/images/food4.png";
+import brunchImage from "@/assets/images/food4.webp";
 import { foodGallery } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale, href } from "@/lib/i18n";

@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    // Images optimisées gardées un an : le serveur ne les recalcule pas à chaque visite.
+    minimumCacheTTL: 31_536_000,
+  },
   experimental: {
     // Plusieurs layouts racines (site bilingue et admin) : 404 globale dans app/global-not-found.tsx.
     globalNotFound: true,

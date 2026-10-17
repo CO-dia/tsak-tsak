@@ -1,14 +1,14 @@
 import Image from "next/image";
 
-import food1 from "@/assets/images/food1.png";
-import food2 from "@/assets/images/food2.png";
-import food3 from "@/assets/images/food3.png";
-import food5 from "@/assets/images/food5.png";
-import instaOne from "@/assets/images/insta-1.jpg";
-import instaThree from "@/assets/images/insta-3.jpg";
-import instaTwo from "@/assets/images/insta-2.jpg";
-import instaReel from "@/assets/images/insta-reel.jpg";
-import resto from "@/assets/images/resto1.png";
+import food1 from "@/assets/images/food1.webp";
+import food2 from "@/assets/images/food2.webp";
+import food3 from "@/assets/images/food3.webp";
+import food5 from "@/assets/images/food5.webp";
+import instaOne from "@/assets/images/insta-1.webp";
+import instaThree from "@/assets/images/insta-3.webp";
+import instaTwo from "@/assets/images/insta-2.webp";
+import instaReel from "@/assets/images/insta-reel.webp";
+import resto from "@/assets/images/resto1.webp";
 import SocialLinks, { FacebookIcon, InstagramIcon } from "@/components/SocialLinks";
 import { Logo } from "@/components/ui";
 import { FACEBOOK_URL } from "@/lib/content";

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 
 import InstagramFeed from "@/components/InstagramFeed";
 import { Arrow } from "@/components/ui";
-import heroImage from "@/assets/images/resto1.png";
+import heroImage from "@/assets/images/resto1.webp";
 import { RESERVATION_URL } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
 import { alternates } from "@/lib/seo";
