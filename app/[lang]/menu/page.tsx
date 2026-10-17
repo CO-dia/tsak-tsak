@@ -6,13 +6,15 @@ import { PageHero } from "@/components/ui";
 import { menuSections } from "@/lib/menu";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale } from "@/lib/i18n";
-import { alternates } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
+import { pageMetadata } from "@/lib/seo";
+import { menuJsonLd } from "@/lib/structured-data";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/menu">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).menu;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, "menu") };
+  return pageMetadata({ lang, route: "menu", title: t.metaTitle, description: t.metaDescription });
 }
 
 export default async function MenuPage({ params }: PageProps<"/[lang]/menu">) {
@@ -49,6 +51,7 @@ export default async function MenuPage({ params }: PageProps<"/[lang]/menu">) {
 
   return (
     <>
+      <JsonLd data={menuJsonLd(lang)} />
       <PageHero index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
       <section className="menu-page section">
         <MenuTabs

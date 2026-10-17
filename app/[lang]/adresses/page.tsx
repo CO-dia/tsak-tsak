@@ -6,39 +6,16 @@ import { Arrow, PageHero } from "@/components/ui";
 import { addresses, telHref } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale } from "@/lib/i18n";
-import { alternates } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
+import { pageMetadata } from "@/lib/seo";
+import { restaurantsJsonLd } from "@/lib/structured-data";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/adresses">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).locations;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, "locations") };
+  return pageMetadata({ lang, route: "locations", title: t.metaTitle, description: t.metaDescription });
 }
-
-// Données structurées pour Google : deux restaurants, adresses et heures.
-const structuredData = {
-  "@context": "https://schema.org",
-  "@graph": addresses.map((item) => ({
-    "@type": "Restaurant",
-    name: item.name,
-    telephone: `+1-${item.phone}`,
-    servesCuisine: "Brunch",
-    url: "https://tsaktsak.com/adresses",
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: item.address,
-      addressLocality: "Montréal",
-      addressRegion: "QC",
-      addressCountry: "CA",
-    },
-    openingHoursSpecification: {
-      "@type": "OpeningHoursSpecification",
-      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-      opens: "08:30",
-      closes: "16:00",
-    },
-  })),
-};
 
 function mapEmbedUrl(query: string, lang: string) {
   return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&hl=${lang}&output=embed`;
@@ -51,10 +28,7 @@ export default async function AddressesPage({ params }: PageProps<"/[lang]/adres
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
-      />
+      <JsonLd data={restaurantsJsonLd(lang)} />
       <PageHero index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
       <section className="locations section">
         {addresses.map((item, index) => {

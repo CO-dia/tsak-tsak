@@ -8,13 +8,15 @@ import { Arrow } from "@/components/ui";
 import heroImage from "@/assets/images/resto1.webp";
 import { RESERVATION_URL } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
-import { alternates } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
+import { pageMetadata } from "@/lib/seo";
+import { restaurantsJsonLd } from "@/lib/structured-data";
 import { hasLocale, href, type RouteKey } from "@/lib/i18n";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
-  return { alternates: alternates(lang, "home") };
+  return pageMetadata({ lang, route: "home", description: getDictionary(lang).meta.description });
 }
 
 export default async function HomePage({ params }: PageProps<"/[lang]">) {
@@ -25,8 +27,9 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
 
   return (
     <>
+      <JsonLd data={restaurantsJsonLd(lang)} />
       <section className="hero">
-        <Image className="hero__image" src={heroImage} alt="" preload sizes="100vw" placeholder="blur" />
+        <Image className="hero__image" src={heroImage} alt={t.home.heroAlt} preload sizes="100vw" placeholder="blur" />
         <div className="hero__shade" />
         <div className="hero__content">
           <p className="eyebrow eyebrow--light">{t.home.eyebrow}</p>
@@ -70,6 +73,25 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
               <Arrow />
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="home-about section" aria-labelledby="home-about-title">
+        <h2 id="home-about-title">{t.home.about.title}</h2>
+        <div>
+          <p>{t.home.about.text1}</p>
+          <p>{t.home.about.text2}</p>
+          <div className="home-about__links">
+            <Link className="button button--dark" href={href(lang, "menu")}>
+              {t.home.about.menu} <Arrow />
+            </Link>
+            <Link className="button button--ghost" href={href(lang, "locations")}>
+              {t.home.about.locations}
+            </Link>
+            <Link className="button button--ghost" href={href(lang, "catering")}>
+              {t.home.about.catering}
+            </Link>
+          </div>
         </div>
       </section>
 

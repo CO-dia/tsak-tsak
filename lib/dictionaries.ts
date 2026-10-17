@@ -2,9 +2,9 @@ import type { Locale } from "@/lib/i18n";
 
 const fr = {
   meta: {
-    title: "Tsak Tsak — Créateur de saveurs · Montréal",
+    title: "Tsak Tsak — Restaurant brunch et cuisine malagasy à Montréal",
     description:
-      "Un restaurant familial au cœur de Montréal, où vous pouvez savourer des brunchs, des dîners et des soupers. Deux adresses, un service traiteur et des produits maison.",
+      "Restaurant familial à Montréal depuis 2009 : brunch, dîner et cuisine malagasy maison, à Beaubien et Saint-Laurent. Menu, traiteur et épicerie.",
     ogLocale: "fr_CA",
   },
   nav: {
@@ -49,6 +49,17 @@ const fr = {
     banner: ["Brunch", "Dîner", "Souper"],
     introEyebrow: "La maison Tsak Tsak",
     introTitle: "À chacun sa façon de nous découvrir.",
+    heroAlt: "Salle à manger du restaurant Tsak Tsak à Montréal",
+    about: {
+      title: "Un restaurant familial à Montréal, depuis 2009.",
+      text1:
+        "Tsak Tsak, c’est une table de quartier où l’on sert le brunch et le dîner tous les jours, avec des plats faits maison : omelettes, bénédictines, crêpes et sandwichs, mais aussi des spécialités malagasy comme le ravitoto, le misao et le poulet au coco.",
+      text2:
+        "Deux adresses vous accueillent : Tsak Tsak Beaubien, rue Beaubien Est, et Tsak Tsak Saint-Laurent, dans le Mile End. Pour vos événements, notre service traiteur prépare buffets et bouchées à votre image.",
+      menu: "Voir le menu",
+      locations: "Nos adresses",
+      catering: "Service traiteur",
+    },
     instagram: {
       eyebrow: "Sur nos réseaux sociaux",
       tagline: "Nos plats, jour après jour.",
@@ -292,9 +303,9 @@ export type Dictionary = typeof fr;
 
 const en: Dictionary = {
   meta: {
-    title: "Tsak Tsak — Flavour creators · Montréal",
+    title: "Tsak Tsak — Brunch restaurant & Malagasy cuisine in Montréal",
     description:
-      "A family restaurant in the heart of Montréal, serving brunch, lunch and dinner. Two locations, catering and house-made products.",
+      "Family restaurant in Montréal since 2009: brunch, lunch and house-made Malagasy cuisine at Beaubien and Saint-Laurent. Menu, catering and shop.",
     ogLocale: "en_CA",
   },
   nav: {
@@ -338,6 +349,17 @@ const en: Dictionary = {
     banner: ["Brunch", "Lunch", "Dinner"],
     introEyebrow: "The Tsak Tsak house",
     introTitle: "Many ways to discover us.",
+    heroAlt: "Dining room of the Tsak Tsak restaurant in Montréal",
+    about: {
+      title: "A family restaurant in Montréal, since 2009.",
+      text1:
+        "Tsak Tsak is a neighbourhood table serving brunch and lunch every day, with house-made dishes: omelettes, eggs Benedict, crêpes and sandwiches, as well as Malagasy specialties such as ravitoto, misao and coconut chicken.",
+      text2:
+        "Two locations welcome you: Tsak Tsak Beaubien, on Beaubien Est, and Tsak Tsak Saint-Laurent, in the Mile End. For your events, our catering service prepares buffets and bites that fit your style.",
+      menu: "See the menu",
+      locations: "Our locations",
+      catering: "Catering service",
+    },
     instagram: {
       eyebrow: "On our social media",
       tagline: "Our dishes, day after day.",

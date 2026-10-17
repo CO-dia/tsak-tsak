@@ -8,13 +8,13 @@ import brunchImage from "@/assets/images/food4.webp";
 import { foodGallery } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale, href } from "@/lib/i18n";
-import { alternates } from "@/lib/seo";
+import { pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/a-propos">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).about;
-  return { title: t.metaTitle, description: t.description, alternates: alternates(lang, "about") };
+  return pageMetadata({ lang, route: "about", title: t.metaTitle, description: t.description });
 }
 
 export default async function AboutPage({ params }: PageProps<"/[lang]/a-propos">) {

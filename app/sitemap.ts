@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return pages.flatMap((page) =>
     locales.map((lang) => ({
       url: `${SITE}${routes[page][lang]}`,
+      lastModified: new Date(),
       changeFrequency: "monthly" as const,
       priority: page === "home" ? 1 : 0.8,
       alternates: {

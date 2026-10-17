@@ -7,13 +7,13 @@ import { Arrow, PageHero } from "@/components/ui";
 import { addresses, cateringPhotos, eventLocations, eventTypes, telHref } from "@/lib/content";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale } from "@/lib/i18n";
-import { alternates } from "@/lib/seo";
+import { pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/traiteur">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).catering;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, "catering") };
+  return pageMetadata({ lang, route: "catering", title: t.metaTitle, description: t.metaDescription });
 }
 
 export default async function CateringPage({ params }: PageProps<"/[lang]/traiteur">) {

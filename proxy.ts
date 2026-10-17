@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalEnglishPath, routeFromPath, routes } from "@/lib/i18n";
 
 /**
+ * - www : redirigé vers le domaine sans www.
  * - Admin : désactivé par défaut (page introuvable) tant que ADMIN_ENABLED n’est pas true. Une fois
  *   activé, sans cookie de session on redirige vers la connexion (la vraie vérification de la
  *   session est faite dans chaque page et action).
@@ -12,6 +13,16 @@ import { internalEnglishPath, routeFromPath, routes } from "@/lib/i18n";
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // www.tsaktsak.com → tsaktsak.com (une seule adresse par page, pour le référencement).
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").split(":")[0];
+  if (host.startsWith("www.")) {
+    const apex = request.nextUrl.clone();
+    apex.protocol = "https";
+    apex.hostname = host.slice(4);
+    apex.port = "";
+    return NextResponse.redirect(apex, 308);
+  }
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     // Admin masqué tant qu’il n’est pas mis en place : l’adresse donne une page introuvable.

@@ -12,7 +12,7 @@ import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { categoryName, listActiveProducts, listCategories, toPublicProduct } from "@/lib/products";
-import { alternates } from "@/lib/seo";
+import { pageMetadata } from "@/lib/seo";
 import { shopComingSoon } from "@/lib/shop-status";
 import { getSettings, localizedSettings } from "@/lib/settings";
 
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/epicerie">
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).shop;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, "shop") };
+  return pageMetadata({ lang, route: "shop", title: t.metaTitle, description: t.metaDescription });
 }
 
 export default async function ShopPage({ params, searchParams }: PageProps<"/[lang]/epicerie">) {

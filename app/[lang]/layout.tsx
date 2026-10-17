@@ -7,6 +7,7 @@ import Header, { HeaderView } from "@/components/Header";
 import { getDictionary } from "@/lib/dictionaries";
 import { fontVariables } from "@/lib/fonts";
 import { hasLocale, htmlLang, locales } from "@/lib/i18n";
+import { OG_IMAGE } from "@/lib/seo";
 import "../globals.css";
 
 export function generateStaticParams() {
@@ -27,7 +28,9 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
       siteName: "Tsak Tsak",
       title: t.title,
       description: t.description,
+      images: [OG_IMAGE],
     },
+    twitter: { card: "summary_large_image", title: t.title, description: t.description, images: [OG_IMAGE.url] },
   };
 }
 

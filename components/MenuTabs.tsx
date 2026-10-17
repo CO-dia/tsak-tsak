@@ -34,7 +34,7 @@ export default function MenuTabs({
             role="tab"
             id={`onglet-${item.id}`}
             aria-selected={item.id === activeSection}
-            aria-controls="menu-panneau"
+            aria-controls={`menu-panneau-${item.id}`}
             key={item.id}
             onClick={() => setActiveSection(item.id)}
           >
@@ -44,16 +44,24 @@ export default function MenuTabs({
         ))}
       </div>
 
-      <div className="menu-sheet" role="tabpanel" id="menu-panneau" aria-labelledby={`onglet-${section.id}`}>
+      {sections.map((current) => (
+      <div
+        className="menu-sheet"
+        role="tabpanel"
+        id={`menu-panneau-${current.id}`}
+        aria-labelledby={`onglet-${current.id}`}
+        hidden={current.id !== section.id}
+        key={current.id}
+      >
         <div className="menu-sheet__heading">
           <p>
-            {section.number} / {labels.alaCarte}
+            {current.number} / {labels.alaCarte}
           </p>
-          <h2>{section.label}</h2>
-          {section.note && <span>{section.note}</span>}
+          <h2>{current.label}</h2>
+          {current.note && <span>{current.note}</span>}
         </div>
         <div className="menu-groups">
-          {section.groups.map((group) => (
+          {current.groups.map((group) => (
             <section className="menu-group" key={group.title}>
               <div className="menu-group__heading">
                 <h3>{group.title}</h3>
@@ -76,6 +84,7 @@ export default function MenuTabs({
         </div>
         <p className="menu-sheet__note">{labels.note}</p>
       </div>
+      ))}
     </>
   );
 }
