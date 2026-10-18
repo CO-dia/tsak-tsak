@@ -25,6 +25,7 @@ export function PageHero({
   title,
   description,
   actions,
+  compact,
 }: {
   index: string;
   eyebrow: string;
@@ -32,9 +33,11 @@ export function PageHero({
   description?: string;
   /** Boutons affichés à la place de la description. */
   actions?: ReactNode;
+  /** Hero réduit (pages utilitaires comme le panier). */
+  compact?: boolean;
 }) {
   return (
-    <section className="page-hero">
+    <section className={compact ? "page-hero page-hero--compact" : "page-hero"}>
       <p className="page-hero__index">{index}</p>
       <div>
         <p className="eyebrow">{eyebrow}</p>

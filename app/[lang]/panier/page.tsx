@@ -32,7 +32,7 @@ export default async function CartPage({ params, searchParams }: PageProps<"/[la
 
   return (
     <>
-      <PageHero index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
+      <PageHero compact index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
       <section className="section cart-page">
         <Suspense fallback={<p className="shop-status">{t.loading}</p>}>
           <Checkout lang={lang} searchParams={searchParams} />
