@@ -85,5 +85,51 @@ export async function sendCateringRequest(
     ].join("\n"),
   });
 
-  return sent ? { status: "success" } : { status: "error", message: t.errorSend, values: request };
+  if (!sent) return { status: "error", message: t.errorSend, values: request };
+
+  // Accusé de réception au client : un échec ici ne doit pas faire échouer la demande, déjà transmise.
+  const firstName = request.name.split(" ")[0];
+  const copy = confirmationText[lang];
+  await sendMail({
+    to: request.email,
+    replyTo: to,
+    subject: copy.subject,
+    text: [
+      `${copy.hello} ${firstName},`,
+      "",
+      copy.body,
+      "",
+      copy.recap,
+      `- ${copy.event} : ${request.eventType}`,
+      `- ${copy.date} : ${request.date}`,
+      `- ${copy.guests} : ${guests}`,
+      "",
+      copy.bye,
+    ].join("\n"),
+  });
+
+  return { status: "success" };
 }
+
+const confirmationText = {
+  fr: {
+    subject: "Nous avons bien reçu votre demande — Tsak Tsak",
+    hello: "Bonjour",
+    body: "Merci de nous avoir écrit! Votre demande traiteur a bien été envoyée. Notre équipe communiquera avec vous sous peu pour discuter de votre événement.",
+    recap: "Rappel de votre demande :",
+    event: "Type d’événement",
+    date: "Date souhaitée",
+    guests: "Nombre de personnes",
+    bye: "À bientôt,\nL’équipe Tsak Tsak\n514-495-7812",
+  },
+  en: {
+    subject: "We received your request — Tsak Tsak",
+    hello: "Hello",
+    body: "Thank you for reaching out! Your catering request has been sent. Our team will get back to you shortly to discuss your event.",
+    recap: "Your request:",
+    event: "Event type",
+    date: "Preferred date",
+    guests: "Number of guests",
+    bye: "See you soon,\nThe Tsak Tsak team\n514-495-7812",
+  },
+};
