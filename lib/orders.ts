@@ -307,6 +307,7 @@ export async function markOrderCompleted(sql: Queryable, orderId: string) {
     where id = ${orderId} and status in ('paid', 'ready')
     returning *
   `;
+  if (order) await sendCompletedEmail(order);
   return order ?? null;
 }
 
@@ -346,6 +347,7 @@ export async function refundOrder(sql: Sql, orderId: string, restock: boolean) {
       }
     }
   });
+  await sendRefundEmail(order);
 }
 
 /** Annule une commande dont le paiement n’a pas été finalisé (et ferme la page de paiement Stripe). */
@@ -435,6 +437,20 @@ const emailText = {
       "Votre commande est prête et sera bientôt en route. Nous vous contacterons pour la livraison.",
     readyPickup: (place: string) =>
       `Votre commande est prête! Vous pouvez venir la chercher au ${place}.`,
+    completedSubject: (n: number) =>
+      `Merci! Votre commande n° ${n} — Tsak Tsak`,
+    completedTitle: "Bon appétit!",
+    completedPickup:
+      "Votre commande a bien été remise. Merci de votre confiance!",
+    completedDelivery:
+      "Votre commande a bien été livrée. Merci de votre confiance!",
+    completedMore:
+      "Nous espérons que vous l’apprécierez. Au plaisir de vous revoir bientôt, à l’épicerie ou à table!",
+    refundSubject: (n: number) =>
+      `Remboursement de votre commande n° ${n} — Tsak Tsak`,
+    refundTitle: "Commande remboursée.",
+    refundBody: (amount: string) =>
+      `Votre commande a été annulée et nous vous avons remboursé ${amount}. Le montant apparaîtra sur votre relevé de carte d’ici 5 à 10 jours ouvrables, selon votre banque.`,
   },
   en: {
     subtotal: "Subtotal",
@@ -462,6 +478,19 @@ const emailText = {
       "Your order is ready and will be on its way soon. We’ll contact you for the delivery.",
     readyPickup: (place: string) =>
       `Your order is ready! You can pick it up at ${place}.`,
+    completedSubject: (n: number) =>
+      `Thank you! Your order no. ${n} — Tsak Tsak`,
+    completedTitle: "Enjoy!",
+    completedPickup:
+      "Your order has been handed over. Thank you for your trust!",
+    completedDelivery:
+      "Your order has been delivered. Thank you for your trust!",
+    completedMore:
+      "We hope you enjoy it. See you again soon, at the grocery or at the table!",
+    refundSubject: (n: number) => `Refund for your order no. ${n} — Tsak Tsak`,
+    refundTitle: "Order refunded.",
+    refundBody: (amount: string) =>
+      `Your order has been cancelled and we refunded ${amount}. The amount will show on your card statement within 5 to 10 business days, depending on your bank.`,
   },
 };
 
@@ -702,6 +731,72 @@ async function sendOrderEmails(
       ],
     }),
     replyTo: order.customerEmail,
+  });
+}
+
+async function sendCompletedEmail(order: Order) {
+  const lang = order.locale ?? "fr";
+  const t = emailText[lang];
+  const firstName = order.customerName.split(" ")[0];
+  const done =
+    order.fulfillment === "delivery" ? t.completedDelivery : t.completedPickup;
+  await sendMail({
+    to: order.customerEmail,
+    subject: t.completedSubject(order.number),
+    text: [
+      `${t.hello} ${firstName},`,
+      "",
+      done,
+      "",
+      t.completedMore,
+      "",
+      t.bye,
+    ].join("\n"),
+    html: renderEmail({
+      lang,
+      siteUrl: siteUrl(),
+      preheader: done,
+      eyebrow: t.orderEyebrow(order.number),
+      title: t.completedTitle,
+      blocks: [
+        { type: "p", text: `${t.hello} ${firstName},\n\n${done}` },
+        { type: "p", text: t.completedMore },
+        { type: "p", text: `${t.question}\n\n${t.bye}` },
+      ],
+    }),
+    replyTo: shopInbox() || undefined,
+  });
+}
+
+async function sendRefundEmail(order: Order) {
+  const lang = order.locale ?? "fr";
+  const t = emailText[lang];
+  const firstName = order.customerName.split(" ")[0];
+  const body = t.refundBody(formatMoney(order.totalCents, lang));
+  await sendMail({
+    to: order.customerEmail,
+    subject: t.refundSubject(order.number),
+    text: [
+      `${t.hello} ${firstName},`,
+      "",
+      body,
+      "",
+      t.question,
+      "",
+      t.bye,
+    ].join("\n"),
+    html: renderEmail({
+      lang,
+      siteUrl: siteUrl(),
+      preheader: body,
+      eyebrow: t.orderEyebrow(order.number),
+      title: t.refundTitle,
+      blocks: [
+        { type: "p", text: `${t.hello} ${firstName},\n\n${body}` },
+        { type: "p", text: `${t.question}\n\n${t.bye}` },
+      ],
+    }),
+    replyTo: shopInbox() || undefined,
   });
 }
 

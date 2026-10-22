@@ -2,7 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { AdminHeader, AdminLoading, StatusBadge, formatDate } from "@/components/admin/ui";
+import { setOrderCompleted, setOrderReady } from "@/app/admin/actions";
+import ClickableRow from "@/components/admin/ClickableRow";
+import { SubmitButton } from "@/components/admin/forms";
+import {
+  AdminHeader,
+  AdminLoading,
+  StatusBadge,
+  formatDate,
+} from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
@@ -17,7 +25,9 @@ import {
 
 export const metadata: Metadata = { title: "Commandes" };
 
-export default function OrdersPage({ searchParams }: PageProps<"/admin/commandes">) {
+export default function OrdersPage({
+  searchParams,
+}: PageProps<"/admin/commandes">) {
   return (
     <>
       <AdminHeader eyebrow="Épicerie" title="Commandes" />
@@ -28,7 +38,11 @@ export default function OrdersPage({ searchParams }: PageProps<"/admin/commandes
   );
 }
 
-async function Orders({ searchParams }: { searchParams: PageProps<"/admin/commandes">["searchParams"] }) {
+async function Orders({
+  searchParams,
+}: {
+  searchParams: PageProps<"/admin/commandes">["searchParams"];
+}) {
   await requireAdmin();
   const { statut } = await searchParams;
   const group = isStatusGroup(statut)
@@ -38,7 +52,10 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
       : "a-preparer";
 
   const sql = await db();
-  const [orders, counts] = await Promise.all([listOrders(sql, group), countOrdersByStatus(sql)]);
+  const [orders, counts] = await Promise.all([
+    listOrders(sql, group),
+    countOrdersByStatus(sql),
+  ]);
   const itemsByOrder = await getItemsByOrder(
     sql,
     orders.map((order) => order.id),
@@ -57,9 +74,10 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
             aria-current={group === key ? "page" : undefined}
           >
             {value.label}
-            {(key === "a-preparer" || key === "pretes") && countFor(value.statuses) > 0 && (
-              <span>{countFor(value.statuses)}</span>
-            )}
+            {(key === "a-preparer" || key === "pretes") &&
+              countFor(value.statuses) > 0 && (
+                <span>{countFor(value.statuses)}</span>
+              )}
           </Link>
         ))}
         <Link
@@ -92,17 +110,26 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                 <th>Réception</th>
                 <th>Statut</th>
                 <th className="num">Total</th>
+                <th>Suivi</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id}>
+                <ClickableRow
+                  key={order.id}
+                  href={`/admin/commandes/${order.id}`}
+                >
                   <td>
-                    <Link className="row-link" href={`/admin/commandes/${order.id}`}>
+                    <Link
+                      className="row-link"
+                      href={`/admin/commandes/${order.id}`}
+                    >
                       {order.number}
                     </Link>
                   </td>
-                  <td className="muted">{formatDate(order.paidAt ?? order.createdAt)}</td>
+                  <td className="muted">
+                    {formatDate(order.paidAt ?? order.createdAt)}
+                  </td>
                   <td>
                     {order.customerName}
                     <br />
@@ -110,7 +137,10 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                     {order.customerEmail && (
                       <>
                         <br />
-                        <a className="muted" href={`mailto:${order.customerEmail}`}>
+                        <a
+                          className="muted"
+                          href={`mailto:${order.customerEmail}`}
+                        >
                           {order.customerEmail}
                         </a>
                       </>
@@ -121,7 +151,9 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                       {(itemsByOrder.get(order.id) ?? []).map((item) => (
                         <li key={item.id}>
                           <strong>{item.quantity} ×</strong> {item.name}
-                          {item.format ? <span className="muted"> · {item.format}</span> : null}
+                          {item.format ? (
+                            <span className="muted"> · {item.format}</span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -133,10 +165,42 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                   </td>
                   <td>
                     <StatusBadge status={order.status} />
-                    {order.stockIssue && <span className="badge badge--warning">Stock</span>}
+                    {order.stockIssue && (
+                      <span className="badge badge--warning">Stock</span>
+                    )}
                   </td>
                   <td className="num">{formatMoney(order.totalCents)}</td>
-                </tr>
+                  <td>
+                    <div className="order-quick-actions">
+                      {order.status === "paid" && (
+                        <form action={setOrderReady}>
+                          <input type="hidden" name="id" value={order.id} />
+                          <input type="hidden" name="notify" value="on" />
+                          <SubmitButton
+                            className="button button--olive button--small"
+                            pendingLabel="…"
+                          >
+                            Prête
+                          </SubmitButton>
+                        </form>
+                      )}
+                      {(order.status === "paid" ||
+                        order.status === "ready") && (
+                        <form action={setOrderCompleted}>
+                          <input type="hidden" name="id" value={order.id} />
+                          <SubmitButton
+                            className="button button--dark button--small"
+                            pendingLabel="…"
+                          >
+                            {order.fulfillment === "delivery"
+                              ? "Livrée"
+                              : "Remise"}
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </div>
+                  </td>
+                </ClickableRow>
               ))}
             </tbody>
           </table>

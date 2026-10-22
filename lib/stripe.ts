@@ -26,7 +26,9 @@ export function getStripe() {
         ? {
             host: process.env.STRIPE_API_HOST,
             port: process.env.STRIPE_API_PORT ?? "12111",
-            protocol: (process.env.STRIPE_API_PROTOCOL as "http" | "https" | undefined) ?? "http",
+            protocol:
+              (process.env.STRIPE_API_PROTOCOL as
+                "http" | "https" | undefined) ?? "http",
           }
         : {}),
     });
@@ -35,7 +37,9 @@ export function getStripe() {
 }
 
 export function stripeMode(): "live" | "test" {
-  return /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY ?? "") ? "live" : "test";
+  return /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY ?? "")
+    ? "live"
+    : "test";
 }
 
 /** Lien vers un paiement dans le tableau de bord Stripe. */
@@ -48,14 +52,28 @@ export function stripePaymentUrl(paymentIntentId: string) {
  * Taux de taxes Stripe (TPS 5 % et TVQ 9,975 %), créés une seule fois par mode (test / réel)
  * puis mémorisés dans la table settings.
  */
-export async function ensureTaxRates(sql: Queryable): Promise<{ gst: string; qst: string }> {
+export async function ensureTaxRates(
+  sql: Queryable,
+): Promise<{ gst: string; qst: string }> {
   const key = `stripe_tax_rates_${stripeMode()}`;
   const [row] = await sql<{ value: { gst: string; qst: string } }[]>`
     select value from settings where key = ${key}
   `;
-  if (row) return row.value;
-
   const stripe = getStripe();
+  if (row) {
+    // Les taux mémorisés peuvent venir d’un autre compte Stripe (ou d’un simulateur) : on les
+    // vérifie, et on les recrée s’ils n’existent plus.
+    try {
+      await Promise.all([
+        stripe.taxRates.retrieve(row.value.gst),
+        stripe.taxRates.retrieve(row.value.qst),
+      ]);
+      return row.value;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "resource_missing") throw error;
+    }
+  }
+
   const [gst, qst] = await Promise.all([
     stripe.taxRates.create({
       display_name: "TPS",
@@ -83,7 +101,7 @@ export async function ensureTaxRates(sql: Queryable): Promise<{ gst: string; qst
   const value = { gst: gst.id, qst: qst.id };
   await sql`
     insert into settings (key, value) values (${key}, ${sql.json(value)})
-    on conflict (key) do nothing
+    on conflict (key) do update set value = excluded.value
   `;
   return value;
 }

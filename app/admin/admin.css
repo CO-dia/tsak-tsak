@@ -961,3 +961,12 @@ a.stat:hover {
 .admin-table tr.is-over {
   box-shadow: 0 -2px 0 var(--olive);
 }
+
+.admin-table tr.is-clickable {
+  cursor: pointer;
+}
+
+.order-quick-actions {
+  display: flex;
+  gap: 8px;
+}

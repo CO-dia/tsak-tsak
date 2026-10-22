@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { AdminHeader, AdminLoading, StatusBadge, formatDate } from "@/components/admin/ui";
+import ClickableRow from "@/components/admin/ClickableRow";
+import {
+  AdminHeader,
+  AdminLoading,
+  StatusBadge,
+  formatDate,
+} from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { mailConfigured } from "@/lib/mail";
@@ -9,7 +15,11 @@ import { formatMoney } from "@/lib/money";
 import { countOrdersByStatus, listOrders, salesSummary } from "@/lib/orders";
 import { listAllProducts } from "@/lib/products";
 import { getSettings } from "@/lib/settings";
-import { stripeConfigured, stripeMode, stripeWebhookConfigured } from "@/lib/stripe";
+import {
+  stripeConfigured,
+  stripeMode,
+  stripeWebhookConfigured,
+} from "@/lib/stripe";
 
 export default function DashboardPage() {
   return (
@@ -32,7 +42,8 @@ async function Dashboard() {
 
   const activeProducts = products.filter((product) => product.isActive).length;
   const lowStock = products.filter(
-    (product) => product.isActive && product.stock !== null && product.stock <= 3,
+    (product) =>
+      product.isActive && product.stock !== null && product.stock <= 3,
   );
 
   const setup = [
@@ -62,7 +73,9 @@ async function Dashboard() {
     },
     {
       done: settings.shopOpen,
-      label: settings.shopOpen ? "La boutique accepte les commandes." : "La boutique est fermée.",
+      label: settings.shopOpen
+        ? "La boutique accepte les commandes."
+        : "La boutique est fermée.",
     },
   ];
 
@@ -79,7 +92,10 @@ async function Dashboard() {
       />
 
       <div className="admin-stats">
-        <Link className={`stat ${counts.paid ? "stat--alert" : ""}`} href="/admin/commandes?statut=a-preparer">
+        <Link
+          className={`stat ${counts.paid ? "stat--alert" : ""}`}
+          href="/admin/commandes?statut=a-preparer"
+        >
           <span className="stat__label">À préparer</span>
           <span className="stat__value">{counts.paid ?? 0}</span>
         </Link>
@@ -88,7 +104,9 @@ async function Dashboard() {
           <span className="stat__value">{counts.ready ?? 0}</span>
         </Link>
         <div className="stat">
-          <span className="stat__label">Ventes du mois ({sales.monthCount})</span>
+          <span className="stat__label">
+            Ventes du mois ({sales.monthCount})
+          </span>
           <span className="stat__value">{formatMoney(sales.monthCents)}</span>
         </div>
         <Link className="stat" href="/admin/produits">
@@ -121,9 +139,15 @@ async function Dashboard() {
                 </thead>
                 <tbody>
                   {recent.map((order) => (
-                    <tr key={order.id}>
+                    <ClickableRow
+                      key={order.id}
+                      href={`/admin/commandes/${order.id}`}
+                    >
                       <td>
-                        <Link className="row-link" href={`/admin/commandes/${order.id}`}>
+                        <Link
+                          className="row-link"
+                          href={`/admin/commandes/${order.id}`}
+                        >
                           {order.number}
                         </Link>
                       </td>
@@ -133,7 +157,7 @@ async function Dashboard() {
                         <StatusBadge status={order.status} />
                       </td>
                       <td className="num">{formatMoney(order.totalCents)}</td>
-                    </tr>
+                    </ClickableRow>
                   ))}
                 </tbody>
               </table>
@@ -146,7 +170,10 @@ async function Dashboard() {
             <h2>Mise en route</h2>
             <ul className="setup-list">
               {setup.map((item) => (
-                <li key={item.label} className={item.done ? undefined : "is-missing"}>
+                <li
+                  key={item.label}
+                  className={item.done ? undefined : "is-missing"}
+                >
                   {item.label}
                 </li>
               ))}

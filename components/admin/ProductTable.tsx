@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { startTransition, useState, type DragEvent } from "react";
 
 import { reorderProducts, toggleProduct } from "@/app/admin/actions";
@@ -21,6 +22,7 @@ export type ProductRow = {
 
 /** Tableau des produits, réordonnable par glisser-déposer (ou avec les flèches). */
 export default function ProductTable({ products }: { products: ProductRow[] }) {
+  const router = useRouter();
   const [order, setOrder] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -73,7 +75,16 @@ export default function ProductTable({ products }: { products: ProductRow[] }) {
             return (
               <tr
                 key={id}
-                className={`${dragging === id ? "is-dragging" : ""}${over === id && dragging !== id ? " is-over" : ""}`}
+                onClick={(event) => {
+                  if (
+                    (event.target as HTMLElement).closest(
+                      "a, button, input, label, form, .row-handle",
+                    )
+                  )
+                    return;
+                  router.push(`/admin/produits/${id}`);
+                }}
+                className={`is-clickable ${dragging === id ? "is-dragging" : ""}${over === id && dragging !== id ? " is-over" : ""}`}
                 onDragOver={(event) => {
                   if (!dragging) return;
                   event.preventDefault();
