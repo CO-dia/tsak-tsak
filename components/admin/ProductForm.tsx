@@ -77,7 +77,7 @@ export default function ProductForm({
           ))}
         </select>
         <p className="field__hint">
-          Onglet de l’épicerie où le produit apparaît. <Link href="/admin/categories">Gérer les catégories</Link>
+          Onglet de l’épicerie où le produit apparaît. <Link href="/admin/produits#categories">Gérer les catégories</Link>
         </p>
       </label>
       <label className="field">

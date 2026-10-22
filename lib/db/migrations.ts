@@ -134,4 +134,32 @@ export const migrations: { id: string; sql: string }[] = [
         where slug in ('confiture-de-saison', 'granola-du-brunch');
     `,
   },
+  {
+    id: "003_commandes_archivees",
+    sql: /* sql */ `
+      alter table orders add column archived_at timestamptz;
+      create index orders_archived_idx on orders (archived_at);
+    `,
+  },
+  {
+    id: "004_demandes_traiteur",
+    sql: /* sql */ `
+      create table catering_requests (
+        id uuid primary key default gen_random_uuid(),
+        name text not null,
+        email text not null,
+        phone text not null,
+        event_type text not null,
+        event_date date not null,
+        guests integer not null,
+        location text not null,
+        message text not null,
+        locale text not null default 'fr' check (locale in ('fr', 'en')),
+        handled_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+
+      create index catering_requests_created_idx on catering_requests (created_at desc);
+    `,
+  },
 ];

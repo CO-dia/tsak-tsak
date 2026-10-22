@@ -6,6 +6,8 @@ type Message = {
   to: string;
   subject: string;
   text: string;
+  /** Version HTML (gabarit lib/email-template) ; le texte reste la version de secours. */
+  html?: string;
   replyTo?: string;
 };
 
@@ -50,6 +52,7 @@ export async function sendMail(message: Message): Promise<boolean> {
       replyTo: message.replyTo,
       subject: message.subject,
       text: message.text,
+      html: message.html,
     });
     return true;
   } catch (error) {

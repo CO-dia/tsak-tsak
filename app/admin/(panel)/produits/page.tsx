@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { toggleProduct } from "@/app/admin/actions";
+import CategoryManager from "@/components/admin/CategoryManager";
 import { SubmitButton } from "@/components/admin/forms";
 import { AdminHeader, AdminLoading } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -35,17 +36,37 @@ export default function ProductsPage() {
 async function Products() {
   await requireAdmin();
   const sql = await db();
-  const [products, categories] = await Promise.all([listAllProducts(sql), listCategories(sql)]);
-  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+  const [products, categories] = await Promise.all([
+    listAllProducts(sql),
+    listCategories(sql),
+  ]);
+  const categoryNames = new Map(
+    categories.map((category) => [category.id, category.name]),
+  );
 
-  if (products.length === 0) {
-    return (
-      <p className="admin-empty">
-        Aucun produit pour l’instant. <Link href="/admin/produits/nouveau">Ajouter un premier produit</Link>.
-      </p>
-    );
-  }
+  return (
+    <>
+      {products.length === 0 ? (
+        <p className="admin-empty">
+          Aucun produit pour l’instant.{" "}
+          <Link href="/admin/produits/nouveau">Ajouter un premier produit</Link>
+          .
+        </p>
+      ) : (
+        <ProductTable products={products} categoryNames={categoryNames} />
+      )}
+      <CategoryManager categories={categories} />
+    </>
+  );
+}
 
+function ProductTable({
+  products,
+  categoryNames,
+}: {
+  products: Awaited<ReturnType<typeof listAllProducts>>;
+  categoryNames: Map<string, string>;
+}) {
   return (
     <div className="admin-card admin-table-wrap">
       <table className="admin-table">
@@ -67,13 +88,20 @@ async function Products() {
                 {product.imageId ? (
                   // Miniature déjà optimisée côté serveur : pas besoin de next/image ici.
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="admin-thumb" src={mediaUrl(product.imageId)} alt="" />
+                  <img
+                    className="admin-thumb"
+                    src={mediaUrl(product.imageId)}
+                    alt=""
+                  />
                 ) : (
                   <span className="admin-thumb image-input__empty">—</span>
                 )}
               </td>
               <td>
-                <Link className="row-link" href={`/admin/produits/${product.id}`}>
+                <Link
+                  className="row-link"
+                  href={`/admin/produits/${product.id}`}
+                >
                   {product.name}
                 </Link>
                 <br />
@@ -83,7 +111,8 @@ async function Products() {
                 </span>
               </td>
               <td>
-                {(product.categoryId && categoryNames.get(product.categoryId)) || (
+                {(product.categoryId &&
+                  categoryNames.get(product.categoryId)) || (
                   <span className="muted">Sans catégorie</span>
                 )}
               </td>
@@ -110,7 +139,10 @@ async function Products() {
                 </form>
               </td>
               <td className="num">
-                <Link className="link-button" href={`/admin/produits/${product.id}`}>
+                <Link
+                  className="link-button"
+                  href={`/admin/produits/${product.id}`}
+                >
                   Modifier
                 </Link>
               </td>
@@ -119,7 +151,8 @@ async function Products() {
         </tbody>
       </table>
       <p className="field__hint" style={{ marginTop: 16 }}>
-        Cliquez sur « Visible » ou « Masqué » pour afficher ou retirer un produit de l’épicerie.
+        Cliquez sur « Visible » ou « Masqué » pour afficher ou retirer un
+        produit de l’épicerie.
       </p>
     </div>
   );

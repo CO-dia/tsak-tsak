@@ -7,7 +7,7 @@ const links = [
   { href: "/admin", label: "Tableau de bord" },
   { href: "/admin/commandes", label: "Commandes" },
   { href: "/admin/produits", label: "Produits" },
-  { href: "/admin/categories", label: "Catégories" },
+  { href: "/admin/demandes", label: "Demandes traiteur" },
   { href: "/admin/parametres", label: "Paramètres" },
   { href: "/admin/compte", label: "Compte" },
 ];

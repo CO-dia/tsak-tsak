@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { cancelOrder, refund, saveOrderNote, setOrderCompleted, setOrderReady } from "@/app/admin/actions";
+import { archiveOrder, cancelOrder, refund, removeOrder, saveOrderNote, setOrderCompleted, setOrderReady } from "@/app/admin/actions";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/admin/forms";
 import { AdminHeader, AdminLoading, StatusBadge, formatDate } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -201,6 +201,39 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
               )}
               {(order.status === "completed" || order.status === "cancelled" || order.status === "refunded") && (
                 <p className="field__hint">Cette commande est terminée.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="admin-card">
+            <h2>Gestion</h2>
+            <div className="order-steps">
+              <form action={archiveOrder}>
+                <input type="hidden" name="id" value={order.id} />
+                <input type="hidden" name="archived" value={order.archivedAt ? "false" : "true"} />
+                <p className="field__hint">
+                  {order.archivedAt
+                    ? "Cette commande est archivée : elle n’apparaît plus dans les listes."
+                    : "Range la commande hors des listes. Elle reste comptée dans les ventes."}
+                </p>
+                <SubmitButton className="button button--ghost button--small">
+                  {order.archivedAt ? "Désarchiver" : "Archiver"}
+                </SubmitButton>
+              </form>
+              {paidStatuses.includes(order.status) ? (
+                <p className="field__hint">
+                  Pour supprimer une commande payée créée par erreur, remboursez-la d’abord.
+                </p>
+              ) : (
+                <form action={removeOrder}>
+                  <input type="hidden" name="id" value={order.id} />
+                  <p className="field__hint">Pour une commande créée par erreur ou un essai.</p>
+                  <ConfirmButton
+                    message={`Supprimer définitivement la commande ${order.number} ? Cette action est irréversible.`}
+                  >
+                    Supprimer la commande
+                  </ConfirmButton>
+                </form>
               )}
             </div>
           </section>

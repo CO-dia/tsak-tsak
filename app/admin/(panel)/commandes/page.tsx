@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import {
   countOrdersByStatus,
+  getItemsByOrder,
   isStatusGroup,
   listOrders,
   statusGroups,
@@ -30,10 +31,18 @@ export default function OrdersPage({ searchParams }: PageProps<"/admin/commandes
 async function Orders({ searchParams }: { searchParams: PageProps<"/admin/commandes">["searchParams"] }) {
   await requireAdmin();
   const { statut } = await searchParams;
-  const group = isStatusGroup(statut) ? statut : statut === "toutes" ? "toutes" : "a-preparer";
+  const group = isStatusGroup(statut)
+    ? statut
+    : statut === "toutes" || statut === "archivees"
+      ? statut
+      : "a-preparer";
 
   const sql = await db();
   const [orders, counts] = await Promise.all([listOrders(sql, group), countOrdersByStatus(sql)]);
+  const itemsByOrder = await getItemsByOrder(
+    sql,
+    orders.map((order) => order.id),
+  );
   const countFor = (statuses: readonly OrderStatus[]) =>
     statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
 
@@ -60,6 +69,13 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
         >
           Toutes
         </Link>
+        <Link
+          href="/admin/commandes?statut=archivees"
+          className={group === "archivees" ? "is-active" : undefined}
+          aria-current={group === "archivees" ? "page" : undefined}
+        >
+          Archivées
+        </Link>
       </nav>
 
       {orders.length === 0 ? (
@@ -72,6 +88,7 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                 <th>N°</th>
                 <th>Date</th>
                 <th>Client</th>
+                <th>Produits</th>
                 <th>Réception</th>
                 <th>Statut</th>
                 <th className="num">Total</th>
@@ -90,6 +107,24 @@ async function Orders({ searchParams }: { searchParams: PageProps<"/admin/comman
                     {order.customerName}
                     <br />
                     <span className="muted">{order.customerPhone}</span>
+                    {order.customerEmail && (
+                      <>
+                        <br />
+                        <a className="muted" href={`mailto:${order.customerEmail}`}>
+                          {order.customerEmail}
+                        </a>
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    <ul className="order-items-inline">
+                      {(itemsByOrder.get(order.id) ?? []).map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.quantity} ×</strong> {item.name}
+                          {item.format ? <span className="muted"> · {item.format}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
                   </td>
                   <td>
                     {order.fulfillment === "delivery"

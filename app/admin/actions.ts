@@ -17,14 +17,17 @@ import {
   tooManyAttempts,
   verifyPassword,
 } from "@/lib/auth";
+import { deleteCateringRequest, setCateringHandled } from "@/lib/catering";
 import { db } from "@/lib/db";
 import { isAcceptedImage, MAX_UPLOAD_BYTES, storeImage } from "@/lib/media";
 import { parseMoney } from "@/lib/money";
 import {
   cancelUnpaidOrder,
+  deleteOrder,
   markOrderCompleted,
   markOrderReady,
   refundOrder,
+  setOrderArchived,
   updateAdminNote,
 } from "@/lib/orders";
 import { isUuid, slugify } from "@/lib/products";
@@ -241,10 +244,8 @@ export async function saveCategory(_previous: FormState, formData: FormData): Pr
   const id = text(formData, "id", 60);
   const name = text(formData, "name", 60);
   const nameEn = text(formData, "nameEn", 60);
-  const position = Number(text(formData, "position", 10) || "0");
 
   if (name.length < 2) return { error: "Indiquez le nom de la catégorie." };
-  if (!Number.isInteger(position)) return { error: "L’ordre d’affichage doit être un nombre entier." };
   if (id && !isUuid(id)) return { error: "Catégorie introuvable." };
 
   // Adresse du filtre (?categorie=…) : tirée du nom français, unique.
@@ -259,7 +260,7 @@ export async function saveCategory(_previous: FormState, formData: FormData): Pr
 
   if (id) {
     const updated = await sql`
-      update categories set name = ${name}, name_en = ${nameEn}, slug = ${slug}, position = ${position}
+      update categories set name = ${name}, name_en = ${nameEn}, slug = ${slug}
       where id = ${id}
       returning id
     `;
@@ -270,10 +271,23 @@ export async function saveCategory(_previous: FormState, formData: FormData): Pr
 
   await sql`
     insert into categories (name, name_en, slug, position)
-    values (${name}, ${nameEn}, ${slug}, ${position})
+    values (${name}, ${nameEn}, ${slug}, (select coalesce(max(position) + 1, 0) from categories))
   `;
   refresh();
   return { success: `Catégorie « ${name} » ajoutée.` };
+}
+
+/** Enregistre l’ordre des onglets : la position de chaque catégorie suit sa place dans la liste. */
+export async function reorderCategories(ids: string[]) {
+  await requireAdmin();
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string" && isUuid(id))) return;
+  const sql = await db();
+  await sql.begin(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx`update categories set position = ${position} where id = ${id}`;
+    }
+  });
+  refresh();
 }
 
 export async function deleteCategory(formData: FormData) {
@@ -330,6 +344,36 @@ export async function cancelOrder(formData: FormData) {
   await requireAdmin();
   const sql = await db();
   await cancelUnpaidOrder(sql, orderId(formData));
+  refresh();
+}
+
+export async function archiveOrder(formData: FormData) {
+  await requireAdmin();
+  const sql = await db();
+  await setOrderArchived(sql, orderId(formData), formData.get("archived") !== "false");
+  refresh();
+}
+
+export async function removeOrder(formData: FormData) {
+  await requireAdmin();
+  const sql = await db();
+  await deleteOrder(sql, orderId(formData));
+  redirect("/admin/commandes");
+}
+
+export async function setCateringRequestHandled(formData: FormData) {
+  await requireAdmin();
+  const id = text(formData, "id", 60);
+  if (!isUuid(id)) return;
+  await setCateringHandled(await db(), id, formData.get("handled") !== "false");
+  refresh();
+}
+
+export async function removeCateringRequest(formData: FormData) {
+  await requireAdmin();
+  const id = text(formData, "id", 60);
+  if (!isUuid(id)) return;
+  await deleteCateringRequest(await db(), id);
   refresh();
 }
 

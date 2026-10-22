@@ -1,6 +1,9 @@
 "use server";
 
 import { eventLocations, eventTypes } from "@/lib/content";
+import { renderEmail } from "@/lib/email-template";
+import { saveCateringRequest } from "@/lib/catering";
+import { db } from "@/lib/db";
 import { getDictionary } from "@/lib/dictionaries";
 import { mailConfigured, sendMail } from "@/lib/mail";
 
@@ -58,15 +61,37 @@ export async function sendCateringRequest(
     };
   }
 
+  // Conservée dans l’admin d’abord : la demande n’est pas perdue même si le courriel échoue.
+  let saved = false;
+  try {
+    await saveCateringRequest(await db(), {
+      ...request,
+      eventType: request.eventType,
+      eventDate: request.date,
+      guests,
+      locale: lang,
+    });
+    saved = true;
+  } catch (error) {
+    console.error("[traiteur] Demande non enregistrée dans l’admin", error);
+  }
+
   const to = process.env.CATERING_EMAIL_TO;
   if (!to || !mailConfigured()) {
-    if (process.env.NODE_ENV !== "production") {
-      console.info("[traiteur] Courriel non configuré, demande reçue :", request);
+    if (saved || process.env.NODE_ENV !== "production") {
+      console.info(
+        "[traiteur] Courriel non configuré, demande reçue :",
+        request,
+      );
       return { status: "success" };
     }
-    console.error("[traiteur] SMTP ou CATERING_EMAIL_TO non configuré : la demande n’a pas été envoyée.");
+    console.error(
+      "[traiteur] SMTP ou CATERING_EMAIL_TO non configuré : la demande n’a pas été envoyée.",
+    );
     return { status: "error", message: t.errorSend, values: request };
   }
+
+  const siteUrl = process.env.SITE_URL ?? "https://tsaktsak.com";
 
   const sent = await sendMail({
     to,
@@ -83,9 +108,39 @@ export async function sendCateringRequest(
       "",
       request.message,
     ].join("\n"),
+    html: renderEmail({
+      eyebrow: "Nouvelle demande",
+      title: "Demande traiteur.",
+      blocks: [
+        {
+          type: "rows",
+          rows: [
+            ["Nom", request.name],
+            ["Courriel", request.email],
+            ["Téléphone", request.phone],
+            ["Événement", request.eventType],
+            ["Date souhaitée", request.date],
+            ["Personnes", String(guests)],
+            ["Lieu", request.location],
+          ],
+        },
+        { type: "note", text: request.message },
+        {
+          type: "button",
+          label: "Voir dans l’admin",
+          url: `${siteUrl}/admin/demandes`,
+        },
+      ],
+      siteUrl,
+    }),
   });
 
-  if (!sent) return { status: "error", message: t.errorSend, values: request };
+  if (!sent) {
+    // Déjà enregistrée dans l’admin : le client n’a pas à renvoyer sa demande.
+    return saved
+      ? { status: "success" }
+      : { status: "error", message: t.errorSend, values: request };
+  }
 
   // Accusé de réception au client : un échec ici ne doit pas faire échouer la demande, déjà transmise.
   const firstName = request.name.split(" ")[0];
@@ -106,6 +161,26 @@ export async function sendCateringRequest(
       "",
       copy.bye,
     ].join("\n"),
+    html: renderEmail({
+      lang,
+      siteUrl,
+      preheader: copy.preheader,
+      eyebrow: copy.eyebrow,
+      title: copy.title,
+      blocks: [
+        { type: "p", text: `${copy.hello} ${firstName},\n\n${copy.body}` },
+        {
+          type: "rows",
+          title: copy.recap.replace(/ ?:$/, ""),
+          rows: [
+            [copy.event, request.eventType],
+            [copy.date, request.date],
+            [copy.guests, String(guests)],
+          ],
+        },
+        { type: "p", text: copy.bye },
+      ],
+    }),
   });
 
   return { status: "success" };
@@ -114,6 +189,9 @@ export async function sendCateringRequest(
 const confirmationText = {
   fr: {
     subject: "Nous avons bien reçu votre demande — Tsak Tsak",
+    preheader: "Notre équipe communiquera avec vous sous peu.",
+    eyebrow: "Traiteur",
+    title: "Demande bien reçue.",
     hello: "Bonjour",
     body: "Merci de nous avoir écrit! Votre demande traiteur a bien été envoyée. Notre équipe communiquera avec vous sous peu pour discuter de votre événement.",
     recap: "Rappel de votre demande :",
@@ -124,6 +202,9 @@ const confirmationText = {
   },
   en: {
     subject: "We received your request — Tsak Tsak",
+    preheader: "Our team will get back to you shortly.",
+    eyebrow: "Catering",
+    title: "Request received.",
     hello: "Hello",
     body: "Thank you for reaching out! Your catering request has been sent. Our team will get back to you shortly to discuss your event.",
     recap: "Your request:",

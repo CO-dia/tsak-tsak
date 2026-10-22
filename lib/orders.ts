@@ -3,9 +3,14 @@ import "server-only";
 import type Stripe from "stripe";
 
 import type { Queryable, Sql } from "@/lib/db";
+import { renderEmail, type EmailBlock } from "@/lib/email-template";
 import { sendMail, shopInbox } from "@/lib/mail";
 import { formatMoney } from "@/lib/money";
-import { getSettings, localizedSettings, type ShopSettings } from "@/lib/settings";
+import {
+  getSettings,
+  localizedSettings,
+  type ShopSettings,
+} from "@/lib/settings";
 import { getStripe } from "@/lib/stripe";
 
 export type OrderStatus =
@@ -52,6 +57,7 @@ export type Order = {
   readyAt: Date | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -83,8 +89,14 @@ export const statusGroups = {
   "a-preparer": { label: "À préparer", statuses: ["paid"] },
   pretes: { label: "Prêtes", statuses: ["ready"] },
   completees: { label: "Complétées", statuses: ["completed"] },
-  annulees: { label: "Annulées et remboursées", statuses: ["cancelled", "refunded"] },
-  "non-payees": { label: "Paiements non finalisés", statuses: ["pending", "expired"] },
+  annulees: {
+    label: "Annulées et remboursées",
+    statuses: ["cancelled", "refunded"],
+  },
+  "non-payees": {
+    label: "Paiements non finalisés",
+    statuses: ["pending", "expired"],
+  },
 } as const satisfies Record<string, { label: string; statuses: OrderStatus[] }>;
 
 export type StatusGroup = keyof typeof statusGroups;
@@ -96,7 +108,9 @@ export function isStatusGroup(value: unknown): value is StatusGroup {
 export function formatAddress(address: DeliveryAddress) {
   return [
     [address.line1, address.line2].filter(Boolean).join(", "),
-    [address.city, address.province, address.postalCode].filter(Boolean).join(" "),
+    [address.city, address.province, address.postalCode]
+      .filter(Boolean)
+      .join(" "),
   ]
     .filter(Boolean)
     .join(", ");
@@ -104,7 +118,9 @@ export function formatAddress(address: DeliveryAddress) {
 
 export function mapsUrl(address: DeliveryAddress) {
   const query = encodeURIComponent(formatAddress(address));
-  const placeId = address.placeId ? `&query_place_id=${encodeURIComponent(address.placeId)}` : "";
+  const placeId = address.placeId
+    ? `&query_place_id=${encodeURIComponent(address.placeId)}`
+    : "";
   return `https://www.google.com/maps/search/?api=1&query=${query}${placeId}`;
 }
 
@@ -116,7 +132,9 @@ export async function getOrder(sql: Queryable, id: string) {
 }
 
 export async function getOrderBySession(sql: Queryable, sessionId: string) {
-  const [order] = await sql<Order[]>`select * from orders where stripe_session_id = ${sessionId}`;
+  const [order] = await sql<
+    Order[]
+  >`select * from orders where stripe_session_id = ${sessionId}`;
   return order ?? null;
 }
 
@@ -126,13 +144,36 @@ export async function getOrderItems(sql: Queryable, orderId: string) {
   `;
 }
 
-export async function listOrders(sql: Queryable, group: StatusGroup | "toutes", limit = 200) {
+/** Produits de plusieurs commandes d’un coup, regroupés par commande (pour les listes). */
+export async function getItemsByOrder(sql: Queryable, orderIds: string[]) {
+  const grouped = new Map<string, OrderItem[]>();
+  if (orderIds.length === 0) return grouped;
+  const items = await sql<OrderItem[]>`
+    select * from order_items where order_id in ${sql(orderIds)} order by name
+  `;
+  for (const item of items)
+    grouped.set(item.orderId, [...(grouped.get(item.orderId) ?? []), item]);
+  return grouped;
+}
+
+export async function listOrders(
+  sql: Queryable,
+  group: StatusGroup | "toutes" | "archivees",
+  limit = 200,
+) {
+  if (group === "archivees") {
+    return sql<Order[]>`
+      select * from orders where archived_at is not null order by archived_at desc limit ${limit}
+    `;
+  }
   if (group === "toutes") {
-    return sql<Order[]>`select * from orders order by created_at desc limit ${limit}`;
+    return sql<Order[]>`
+      select * from orders where archived_at is null order by created_at desc limit ${limit}
+    `;
   }
   const statuses = [...statusGroups[group].statuses];
   return sql<Order[]>`
-    select * from orders where status in ${sql(statuses)}
+    select * from orders where archived_at is null and status in ${sql(statuses)}
     order by ${group === "a-preparer" || group === "pretes" ? sql`paid_at asc` : sql`created_at desc`}
     limit ${limit}
   `;
@@ -140,11 +181,11 @@ export async function listOrders(sql: Queryable, group: StatusGroup | "toutes", 
 
 export async function countOrdersByStatus(sql: Queryable) {
   const rows = await sql<{ status: OrderStatus; count: number }[]>`
-    select status, count(*)::int as count from orders group by status
+    select status, count(*)::int as count from orders where archived_at is null group by status
   `;
-  const counts = Object.fromEntries(rows.map((row) => [row.status, row.count])) as Partial<
-    Record<OrderStatus, number>
-  >;
+  const counts = Object.fromEntries(
+    rows.map((row) => [row.status, row.count]),
+  ) as Partial<Record<OrderStatus, number>>;
   return counts;
 }
 
@@ -164,13 +205,21 @@ export async function salesSummary(sql: Queryable) {
  * Marque la commande payée à partir d’une session Checkout réglée. Idempotent : peut être appelé
  * par le webhook et par la page de confirmation sans risque de doublon.
  */
-export async function finalizePaidSession(sql: Sql, session: Stripe.Checkout.Session) {
-  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
+export async function finalizePaidSession(
+  sql: Sql,
+  session: Stripe.Checkout.Session,
+) {
+  if (
+    session.payment_status !== "paid" &&
+    session.payment_status !== "no_payment_required"
+  ) {
     return null;
   }
 
   const paymentIntent =
-    typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id;
 
   const result = await sql.begin(async (tx) => {
     const [order] = await tx<Order[]>`
@@ -186,7 +235,9 @@ export async function finalizePaidSession(sql: Sql, session: Stripe.Checkout.Ses
     `;
     if (!order) return null;
 
-    const items = await tx<OrderItem[]>`select * from order_items where order_id = ${order.id}`;
+    const items = await tx<
+      OrderItem[]
+    >`select * from order_items where order_id = ${order.id}`;
     let stockIssue = false;
     for (const item of items) {
       if (!item.productId) continue;
@@ -221,7 +272,10 @@ export async function markSessionExpired(sql: Queryable, sessionId: string) {
 }
 
 /** Remboursement fait depuis le tableau de bord Stripe : on aligne le statut de la commande. */
-export async function markPaymentRefunded(sql: Queryable, paymentIntentId: string) {
+export async function markPaymentRefunded(
+  sql: Queryable,
+  paymentIntentId: string,
+) {
   await sql`
     update orders set status = 'refunded', cancelled_at = coalesce(cancelled_at, now()), updated_at = now()
     where stripe_payment_intent_id = ${paymentIntentId} and status in ('paid', 'ready', 'completed')
@@ -230,7 +284,11 @@ export async function markPaymentRefunded(sql: Queryable, paymentIntentId: strin
 
 // ---------- Actions de l’admin ----------
 
-export async function markOrderReady(sql: Sql, orderId: string, notifyCustomer: boolean) {
+export async function markOrderReady(
+  sql: Sql,
+  orderId: string,
+  notifyCustomer: boolean,
+) {
   const [order] = await sql<Order[]>`
     update orders set status = 'ready', ready_at = now(), updated_at = now()
     where id = ${orderId} and status = 'paid'
@@ -263,7 +321,10 @@ export async function refundOrder(sql: Sql, orderId: string, restock: boolean) {
   }
 
   await getStripe().refunds.create(
-    { payment_intent: order.stripePaymentIntentId, reason: "requested_by_customer" },
+    {
+      payment_intent: order.stripePaymentIntentId,
+      reason: "requested_by_customer",
+    },
     { idempotencyKey: `refund-${order.id}` },
   );
 
@@ -273,7 +334,9 @@ export async function refundOrder(sql: Sql, orderId: string, restock: boolean) {
       where id = ${order.id}
     `;
     if (restock) {
-      const items = await tx<OrderItem[]>`select * from order_items where order_id = ${order.id}`;
+      const items = await tx<
+        OrderItem[]
+      >`select * from order_items where order_id = ${order.id}`;
       for (const item of items) {
         if (!item.productId) continue;
         await tx`
@@ -294,8 +357,11 @@ export async function cancelUnpaidOrder(sql: Queryable, orderId: string) {
   `;
   if (order?.stripeSessionId) {
     try {
-      const session = await getStripe().checkout.sessions.retrieve(order.stripeSessionId);
-      if (session.status === "open") await getStripe().checkout.sessions.expire(session.id);
+      const session = await getStripe().checkout.sessions.retrieve(
+        order.stripeSessionId,
+      );
+      if (session.status === "open")
+        await getStripe().checkout.sessions.expire(session.id);
     } catch (error) {
       console.warn("[commandes] Impossible d’expirer la session Stripe", error);
     }
@@ -303,7 +369,40 @@ export async function cancelUnpaidOrder(sql: Queryable, orderId: string) {
   return order ?? null;
 }
 
-export async function updateAdminNote(sql: Queryable, orderId: string, note: string) {
+/** Range une commande hors des listes (elle reste comptée dans les ventes) ou la ressort des archives. */
+export async function setOrderArchived(
+  sql: Queryable,
+  orderId: string,
+  archived: boolean,
+) {
+  await sql`
+    update orders set archived_at = ${archived ? sql`now()` : null}, updated_at = now() where id = ${orderId}
+  `;
+}
+
+/**
+ * Supprime définitivement une commande créée par erreur. Refusé tant que de l’argent a été
+ * encaissé (payée, prête, complétée) : il faut d’abord la rembourser, ou simplement l’archiver.
+ */
+export async function deleteOrder(sql: Queryable, orderId: string) {
+  const order = await getOrder(sql, orderId);
+  if (!order) return;
+  if (["paid", "ready", "completed"].includes(order.status)) {
+    throw new Error(
+      "Une commande payée ne peut pas être supprimée : remboursez-la d’abord, ou archivez-la.",
+    );
+  }
+  // Ferme la page de paiement Stripe pour qu’un paiement tardif ne tombe pas sur une commande disparue.
+  if (order.status === "pending" || order.status === "expired")
+    await cancelUnpaidOrder(sql, orderId);
+  await sql`delete from orders where id = ${orderId}`;
+}
+
+export async function updateAdminNote(
+  sql: Queryable,
+  orderId: string,
+  note: string,
+) {
   await sql`update orders set admin_note = ${note}, updated_at = now() where id = ${orderId}`;
 }
 
@@ -317,16 +416,25 @@ const emailText = {
     taxes: "Taxes",
     totalPaid: "Total payé",
     deliveryTo: "Livraison à",
+    address: "Adresse",
+    place: "Lieu",
+    orderEyebrow: (n: number) => `Commande n° ${n}`,
+    thanksTitle: "Merci pour votre commande.",
+    readyTitle: "Votre commande est prête!",
     pickup: "Ramassage",
     hello: "Bonjour",
-    thanksSubject: (n: number) => `Merci pour votre commande n° ${n} — Tsak Tsak`,
-    thanks: (n: number) => `Merci pour votre commande n° ${n}! Votre paiement a bien été reçu.`,
-    question: "Une question? Répondez simplement à ce courriel ou appelez-nous au 514-495-7812.",
+    thanksSubject: (n: number) =>
+      `Merci pour votre commande n° ${n} — Tsak Tsak`,
+    thanks: (n: number) =>
+      `Merci pour votre commande n° ${n}! Votre paiement a bien été reçu.`,
+    question:
+      "Une question? Répondez simplement à ce courriel ou appelez-nous au 514-495-7812.",
     bye: "À bientôt,\nL’équipe Tsak Tsak",
     readySubject: (n: number) => `Votre commande n° ${n} est prête — Tsak Tsak`,
     readyDelivery:
       "Votre commande est prête et sera bientôt en route. Nous vous contacterons pour la livraison.",
-    readyPickup: (place: string) => `Votre commande est prête! Vous pouvez venir la chercher au ${place}.`,
+    readyPickup: (place: string) =>
+      `Votre commande est prête! Vous pouvez venir la chercher au ${place}.`,
   },
   en: {
     subtotal: "Subtotal",
@@ -335,15 +443,25 @@ const emailText = {
     taxes: "Taxes",
     totalPaid: "Total paid",
     deliveryTo: "Delivery to",
+    address: "Address",
+    place: "Location",
+    orderEyebrow: (n: number) => `Order no. ${n}`,
+    thanksTitle: "Thank you for your order.",
+    readyTitle: "Your order is ready!",
     pickup: "Pickup",
     hello: "Hello",
-    thanksSubject: (n: number) => `Thank you for your order no. ${n} — Tsak Tsak`,
-    thanks: (n: number) => `Thank you for your order no. ${n}! We received your payment.`,
-    question: "Any questions? Simply reply to this email or call us at 514-495-7812.",
+    thanksSubject: (n: number) =>
+      `Thank you for your order no. ${n} — Tsak Tsak`,
+    thanks: (n: number) =>
+      `Thank you for your order no. ${n}! We received your payment.`,
+    question:
+      "Any questions? Simply reply to this email or call us at 514-495-7812.",
     bye: "See you soon,\nThe Tsak Tsak team",
     readySubject: (n: number) => `Your order no. ${n} is ready — Tsak Tsak`,
-    readyDelivery: "Your order is ready and will be on its way soon. We’ll contact you for the delivery.",
-    readyPickup: (place: string) => `Your order is ready! You can pick it up at ${place}.`,
+    readyDelivery:
+      "Your order is ready and will be on its way soon. We’ll contact you for the delivery.",
+    readyPickup: (place: string) =>
+      `Your order is ready! You can pick it up at ${place}.`,
   },
 };
 
@@ -362,23 +480,101 @@ function itemsText(order: Order, items: OrderItem[], lang: "fr" | "en") {
       `${t.delivery} : ${order.deliveryFeeCents > 0 ? formatMoney(order.deliveryFeeCents, lang) : t.free}`,
     );
   }
-  if (order.taxCents > 0) lines.push(`${t.taxes} : ${formatMoney(order.taxCents, lang)}`);
+  if (order.taxCents > 0)
+    lines.push(`${t.taxes} : ${formatMoney(order.taxCents, lang)}`);
   lines.push(`${t.totalPaid} : ${formatMoney(order.totalCents, lang)}`);
   return lines.join("\n");
 }
 
-function fulfillmentText(order: Order, settings: ShopSettings, lang: "fr" | "en") {
+function itemsBlock(
+  order: Order,
+  items: OrderItem[],
+  lang: "fr" | "en",
+  title: string,
+): EmailBlock {
+  const t = emailText[lang];
+  const totals: [string, string][] = [
+    [t.subtotal, formatMoney(order.subtotalCents, lang)],
+  ];
+  if (order.fulfillment === "delivery") {
+    totals.push([
+      t.delivery,
+      order.deliveryFeeCents > 0
+        ? formatMoney(order.deliveryFeeCents, lang)
+        : t.free,
+    ]);
+  }
+  if (order.taxCents > 0)
+    totals.push([t.taxes, formatMoney(order.taxCents, lang)]);
+  totals.push([t.totalPaid, formatMoney(order.totalCents, lang)]);
+  return {
+    type: "items",
+    title,
+    items: items.map((item) => ({
+      quantity: item.quantity,
+      name: lang === "en" && item.nameEn ? item.nameEn : item.name,
+      detail: item.format || undefined,
+      price: formatMoney(item.unitPriceCents * item.quantity, lang),
+    })),
+    totals,
+  };
+}
+
+function fulfillmentBlocks(
+  order: Order,
+  settings: ShopSettings,
+  lang: "fr" | "en",
+): EmailBlock[] {
+  const t = emailText[lang];
+  const texts = localizedSettings(settings, lang);
+  const delivery = order.fulfillment === "delivery" && order.deliveryAddress;
+  const blocks: EmailBlock[] = [
+    {
+      type: "rows",
+      title: delivery ? t.delivery : t.pickup,
+      rows: [
+        [
+          delivery ? t.address : t.place,
+          delivery
+            ? formatAddress(order.deliveryAddress!)
+            : (order.pickupLocation ?? ""),
+        ],
+      ],
+    },
+  ];
+  const instructions = delivery
+    ? texts.deliveryInstructions
+    : texts.pickupInstructions;
+  if (instructions) blocks.push({ type: "note", text: instructions });
+  return blocks;
+}
+
+const siteUrl = () => process.env.SITE_URL ?? "https://tsaktsak.com";
+
+function fulfillmentText(
+  order: Order,
+  settings: ShopSettings,
+  lang: "fr" | "en",
+) {
   const t = emailText[lang];
   const texts = localizedSettings(settings, lang);
   if (order.fulfillment === "delivery" && order.deliveryAddress) {
-    return [`${t.deliveryTo} : ${formatAddress(order.deliveryAddress)}`, texts.deliveryInstructions].join(
-      "\n",
-    );
+    return [
+      `${t.deliveryTo} : ${formatAddress(order.deliveryAddress)}`,
+      texts.deliveryInstructions,
+    ].join("\n");
   }
-  return [`${t.pickup} : ${order.pickupLocation}`, texts.pickupInstructions].join("\n");
+  return [
+    `${t.pickup} : ${order.pickupLocation}`,
+    texts.pickupInstructions,
+  ].join("\n");
 }
 
-async function sendOrderEmails(order: Order, items: OrderItem[], settings: ShopSettings) {
+async function sendOrderEmails(
+  order: Order,
+  items: OrderItem[],
+  settings: ShopSettings,
+) {
   const lang = order.locale ?? "fr";
   const t = emailText[lang];
   const firstName = order.customerName.split(" ")[0];
@@ -398,6 +594,27 @@ async function sendOrderEmails(order: Order, items: OrderItem[], settings: ShopS
       "",
       t.bye,
     ].join("\n"),
+    html: renderEmail({
+      lang,
+      siteUrl: siteUrl(),
+      preheader: t.thanks(order.number),
+      eyebrow: t.orderEyebrow(order.number),
+      title: t.thanksTitle,
+      blocks: [
+        {
+          type: "p",
+          text: `${t.hello} ${firstName},\n\n${t.thanks(order.number)}`,
+        },
+        itemsBlock(
+          order,
+          items,
+          lang,
+          lang === "en" ? "Your order" : "Votre commande",
+        ),
+        ...fulfillmentBlocks(order, settings, lang),
+        { type: "p", text: `${t.question}\n\n${t.bye}` },
+      ],
+    }),
     replyTo: shopInbox(settings.notificationEmail) || undefined,
   });
 
@@ -407,12 +624,18 @@ async function sendOrderEmails(order: Order, items: OrderItem[], settings: ShopS
   await sendMail({
     to: inbox,
     subject: `Nouvelle commande n° ${order.number} — ${
-      order.fulfillment === "delivery" ? "Livraison" : `Ramassage ${order.pickupLocation}`
+      order.fulfillment === "delivery"
+        ? "Livraison"
+        : `Ramassage ${order.pickupLocation}`
     }`,
     text: [
       `Commande n° ${order.number} payée (${formatMoney(order.totalCents)}).`,
-      lang === "en" ? "Client anglophone : la confirmation lui a été envoyée en anglais." : "",
-      order.stockIssue ? "\nATTENTION : stock insuffisant pour au moins un produit.\n" : "",
+      lang === "en"
+        ? "Client anglophone : la confirmation lui a été envoyée en anglais."
+        : "",
+      order.stockIssue
+        ? "\nATTENTION : stock insuffisant pour au moins un produit.\n"
+        : "",
       `Client : ${order.customerName}`,
       `Courriel : ${order.customerEmail}`,
       `Téléphone : ${order.customerPhone}`,
@@ -428,6 +651,56 @@ async function sendOrderEmails(order: Order, items: OrderItem[], settings: ShopS
     ]
       .filter((line, index, all) => line !== "" || all[index - 1] !== "")
       .join("\n"),
+    html: renderEmail({
+      siteUrl: siteUrl(),
+      eyebrow: `Commande n° ${order.number}`,
+      title: "Nouvelle commande.",
+      blocks: [
+        ...(order.stockIssue
+          ? [
+              {
+                type: "note",
+                text: "ATTENTION : stock insuffisant pour au moins un produit.",
+              } as const,
+            ]
+          : []),
+        {
+          type: "rows",
+          title: "Client",
+          rows: [
+            ["Nom", order.customerName],
+            ["Courriel", order.customerEmail],
+            ["Téléphone", order.customerPhone],
+            ...(lang === "en"
+              ? [["Langue", "Anglais"] as [string, string]]
+              : []),
+          ],
+        },
+        itemsBlock(order, items, "fr", "À préparer"),
+        {
+          type: "rows",
+          title: order.fulfillment === "delivery" ? "Livraison" : "Ramassage",
+          rows: [
+            order.fulfillment === "delivery" && order.deliveryAddress
+              ? ["Adresse", formatAddress(order.deliveryAddress)]
+              : ["Lieu", order.pickupLocation ?? ""],
+          ],
+        },
+        ...(order.customerNote
+          ? [
+              {
+                type: "note",
+                text: `Note du client : ${order.customerNote}`,
+              } as const,
+            ]
+          : []),
+        {
+          type: "button",
+          label: "Gérer la commande",
+          url: `${siteUrl()}/admin/commandes/${order.id}`,
+        },
+      ],
+    }),
     replyTo: order.customerEmail,
   });
 }
@@ -442,10 +715,33 @@ async function sendReadyEmail(order: Order, settings: ShopSettings) {
     text: [
       `${t.hello} ${firstName},`,
       "",
-      order.fulfillment === "delivery" ? t.readyDelivery : t.readyPickup(order.pickupLocation ?? ""),
+      order.fulfillment === "delivery"
+        ? t.readyDelivery
+        : t.readyPickup(order.pickupLocation ?? ""),
       "",
       t.bye,
     ].join("\n"),
+    html: renderEmail({
+      lang,
+      siteUrl: siteUrl(),
+      preheader:
+        order.fulfillment === "delivery"
+          ? t.readyDelivery
+          : t.readyPickup(order.pickupLocation ?? ""),
+      eyebrow: t.orderEyebrow(order.number),
+      title: t.readyTitle,
+      blocks: [
+        { type: "p", text: `${t.hello} ${firstName},` },
+        {
+          type: "p",
+          text:
+            order.fulfillment === "delivery"
+              ? t.readyDelivery
+              : t.readyPickup(order.pickupLocation ?? ""),
+        },
+        { type: "p", text: t.bye },
+      ],
+    }),
     replyTo: shopInbox(settings.notificationEmail) || undefined,
   });
 }
