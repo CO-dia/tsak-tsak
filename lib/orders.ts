@@ -389,6 +389,11 @@ export async function setOrderArchived(
 export async function deleteOrder(sql: Queryable, orderId: string) {
   const order = await getOrder(sql, orderId);
   if (!order) return;
+  if (!order.archivedAt) {
+    throw new Error(
+      "Archivez d’abord la commande : la suppression se fait depuis les archives.",
+    );
+  }
   if (["paid", "ready", "completed"].includes(order.status)) {
     throw new Error(
       "Une commande payée ne peut pas être supprimée : remboursez-la d’abord, ou archivez-la.",

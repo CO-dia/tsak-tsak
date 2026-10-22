@@ -19,7 +19,7 @@ import {
   verifyAgainstDummy,
   verifyPassword,
 } from "@/lib/auth";
-import { deleteCateringRequest, setCateringHandled } from "@/lib/catering";
+import { deleteCateringRequest, setCateringArchived, setCateringHandled } from "@/lib/catering";
 import { db } from "@/lib/db";
 import { isAcceptedImage, MAX_UPLOAD_BYTES, storeImage } from "@/lib/media";
 import { parseMoney } from "@/lib/money";
@@ -433,6 +433,14 @@ export async function setCateringRequestHandled(formData: FormData) {
   const id = text(formData, "id", 60);
   if (!isUuid(id)) return;
   await setCateringHandled(await db(), id, formData.get("handled") !== "false");
+  refresh();
+}
+
+export async function archiveCateringRequest(formData: FormData) {
+  await requireAdmin();
+  const id = text(formData, "id", 60);
+  if (!isUuid(id)) return;
+  await setCateringArchived(await db(), id, formData.get("archived") !== "false");
   refresh();
 }
 

@@ -15,12 +15,13 @@ export type CateringRequest = {
   message: string;
   locale: "fr" | "en";
   handledAt: Date | null;
+  archivedAt: Date | null;
   createdAt: Date;
 };
 
 export type NewCateringRequest = Omit<
   CateringRequest,
-  "id" | "handledAt" | "createdAt"
+  "id" | "handledAt" | "archivedAt" | "createdAt"
 >;
 
 export async function saveCateringRequest(
@@ -34,16 +35,22 @@ export async function saveCateringRequest(
   `;
 }
 
+export type CateringView = "a-traiter" | "traitees" | "archivees";
+
 export async function listCateringRequests(
   sql: Queryable,
-  handled: boolean,
+  view: CateringView,
   limit = 200,
 ) {
+  const where =
+    view === "archivees"
+      ? sql`archived_at is not null`
+      : sql`archived_at is null and (handled_at is not null) = ${view === "traitees"}`;
   return sql<CateringRequest[]>`
     select id, name, email, phone, event_type, event_date::text as event_date, guests, location, message,
-           locale, handled_at, created_at
+           locale, handled_at, archived_at, created_at
     from catering_requests
-    where (handled_at is not null) = ${handled}
+    where ${where}
     order by created_at desc
     limit ${limit}
   `;
@@ -51,7 +58,7 @@ export async function listCateringRequests(
 
 export async function countOpenCateringRequests(sql: Queryable) {
   const [{ count }] = await sql<{ count: number }[]>`
-    select count(*)::int as count from catering_requests where handled_at is null
+    select count(*)::int as count from catering_requests where handled_at is null and archived_at is null
   `;
   return count;
 }
@@ -64,6 +71,15 @@ export async function setCateringHandled(
   await sql`update catering_requests set handled_at = ${handled ? sql`now()` : null} where id = ${id}`;
 }
 
+export async function setCateringArchived(
+  sql: Queryable,
+  id: string,
+  archived: boolean,
+) {
+  await sql`update catering_requests set archived_at = ${archived ? sql`now()` : null} where id = ${id}`;
+}
+
+/** Suppression définitive : seulement depuis les archives, pour éviter de perdre une demande par erreur. */
 export async function deleteCateringRequest(sql: Queryable, id: string) {
-  await sql`delete from catering_requests where id = ${id}`;
+  await sql`delete from catering_requests where id = ${id} and archived_at is not null`;
 }

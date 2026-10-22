@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { saveProduct } from "@/app/admin/actions";
 import { ActionForm, SubmitButton } from "@/components/admin/forms";
+import { shrinkImage } from "@/lib/client-image";
 
 export type ProductFormValues = {
   id?: string;
@@ -144,14 +145,25 @@ export default function ProductForm({
               name="image"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/avif,image/heic"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                setPreview(file ? URL.createObjectURL(file) : product.imageUrl);
+              onChange={async (event) => {
+                const input = event.target;
+                const original = input.files?.[0];
+                setPreview(
+                  original ? URL.createObjectURL(original) : product.imageUrl,
+                );
+                if (!original) return;
+                // Photo réduite dans le navigateur avant l’envoi (voir lib/client-image.ts).
+                const smaller = await shrinkImage(original);
+                if (smaller !== original) {
+                  const transfer = new DataTransfer();
+                  transfer.items.add(smaller);
+                  input.files = transfer.files;
+                }
               }}
             />
             <p className="field__hint">
               JPEG, PNG ou WebP, 10 Mo au plus. Format portrait conseillé.
-              L’image est recadrée et optimisée automatiquement.
+              L’image est réduite et compressée automatiquement.
             </p>
           </div>
         </div>

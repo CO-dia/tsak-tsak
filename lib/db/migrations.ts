@@ -174,4 +174,10 @@ export const migrations: { id: string; sql: string }[] = [
       create index login_attempts_key_idx on login_attempts (key, created_at);
     `,
   },
+  {
+    id: "006_demandes_archivees",
+    sql: /* sql */ `
+      alter table catering_requests add column archived_at timestamptz;
+    `,
+  },
 ];

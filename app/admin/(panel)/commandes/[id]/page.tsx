@@ -3,9 +3,26 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { archiveOrder, cancelOrder, refund, removeOrder, saveOrderNote, setOrderCompleted, setOrderReady } from "@/app/admin/actions";
-import { ActionForm, ConfirmButton, SubmitButton } from "@/components/admin/forms";
-import { AdminHeader, AdminLoading, StatusBadge, formatDate } from "@/components/admin/ui";
+import {
+  archiveOrder,
+  cancelOrder,
+  refund,
+  removeOrder,
+  saveOrderNote,
+  setOrderCompleted,
+  setOrderReady,
+} from "@/app/admin/actions";
+import {
+  ActionForm,
+  ConfirmButton,
+  SubmitButton,
+} from "@/components/admin/forms";
+import {
+  AdminHeader,
+  AdminLoading,
+  StatusBadge,
+  formatDate,
+} from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
@@ -15,7 +32,9 @@ import { stripePaymentUrl } from "@/lib/stripe";
 
 export const metadata: Metadata = { title: "Commande" };
 
-export default function OrderPage({ params }: PageProps<"/admin/commandes/[id]">) {
+export default function OrderPage({
+  params,
+}: PageProps<"/admin/commandes/[id]">) {
   return (
     <Suspense fallback={<AdminLoading />}>
       <OrderDetail params={params} />
@@ -23,7 +42,11 @@ export default function OrderPage({ params }: PageProps<"/admin/commandes/[id]">
   );
 }
 
-async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id]">["params"] }) {
+async function OrderDetail({
+  params,
+}: {
+  params: PageProps<"/admin/commandes/[id]">["params"];
+}) {
   await requireAdmin();
   const { id } = await params;
   if (!isUuid(id)) notFound();
@@ -49,8 +72,8 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
 
       {order.stockIssue && (
         <p className="notice notice--warning" style={{ marginBottom: 24 }}>
-          Le stock était insuffisant pour au moins un produit au moment du paiement. Vérifiez la
-          disponibilité avant de préparer la commande.
+          Le stock était insuffisant pour au moins un produit au moment du
+          paiement. Vérifiez la disponibilité avant de préparer la commande.
         </p>
       )}
 
@@ -63,9 +86,13 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
                 <li key={item.id}>
                   <span>
                     <strong>{item.quantity} ×</strong> {item.name}
-                    {item.format ? <span className="muted"> · {item.format}</span> : null}
+                    {item.format ? (
+                      <span className="muted"> · {item.format}</span>
+                    ) : null}
                   </span>
-                  <span>{formatMoney(item.unitPriceCents * item.quantity)}</span>
+                  <span>
+                    {formatMoney(item.unitPriceCents * item.quantity)}
+                  </span>
                 </li>
               ))}
               <li>
@@ -75,7 +102,11 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
               {order.fulfillment === "delivery" && (
                 <li>
                   <span className="muted">Livraison</span>
-                  <span>{order.deliveryFeeCents > 0 ? formatMoney(order.deliveryFeeCents) : "Sans frais"}</span>
+                  <span>
+                    {order.deliveryFeeCents > 0
+                      ? formatMoney(order.deliveryFeeCents)
+                      : "Sans frais"}
+                  </span>
                 </li>
               )}
               {order.taxCents > 0 && (
@@ -101,19 +132,29 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
               <div>
                 <dt>Contact</dt>
                 <dd>
-                  <a href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a>
+                  <a href={`mailto:${order.customerEmail}`}>
+                    {order.customerEmail}
+                  </a>
                   <br />
-                  <a href={`tel:${order.customerPhone.replace(/[^\d+]/g, "")}`}>{order.customerPhone}</a>
+                  <a href={`tel:${order.customerPhone.replace(/[^\d+]/g, "")}`}>
+                    {order.customerPhone}
+                  </a>
                 </dd>
               </div>
               <div>
-                <dt>{order.fulfillment === "delivery" ? "Livraison" : "Ramassage"}</dt>
+                <dt>
+                  {order.fulfillment === "delivery" ? "Livraison" : "Ramassage"}
+                </dt>
                 <dd>
                   {order.fulfillment === "delivery" && order.deliveryAddress ? (
                     <>
                       {formatAddress(order.deliveryAddress)}
                       <br />
-                      <a href={mapsUrl(order.deliveryAddress)} target="_blank" rel="noreferrer">
+                      <a
+                        href={mapsUrl(order.deliveryAddress)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Ouvrir dans Google Maps ↗
                       </a>
                     </>
@@ -124,21 +165,28 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
               </div>
               <div>
                 <dt>Note du client</dt>
-                <dd>{order.customerNote || <span className="muted">Aucune</span>}</dd>
+                <dd>
+                  {order.customerNote || <span className="muted">Aucune</span>}
+                </dd>
               </div>
             </dl>
           </section>
 
           <section className="admin-card">
             <h2>Note interne</h2>
-            <ActionForm action={saveOrderNote} className="admin-form admin-form--single">
+            <ActionForm
+              action={saveOrderNote}
+              className="admin-form admin-form--single"
+            >
               <input type="hidden" name="id" value={order.id} />
               <label className="field">
                 <span>Visible seulement dans l’admin</span>
                 <textarea name="note" defaultValue={order.adminNote} rows={3} />
               </label>
               <div className="form-footer">
-                <SubmitButton className="button button--ghost button--small">Enregistrer la note</SubmitButton>
+                <SubmitButton className="button button--ghost button--small">
+                  Enregistrer la note
+                </SubmitButton>
               </div>
             </ActionForm>
           </section>
@@ -162,14 +210,18 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
                       </small>
                     </span>
                   </label>
-                  <SubmitButton className="button button--olive">Marquer comme prête</SubmitButton>
+                  <SubmitButton className="button button--olive">
+                    Marquer comme prête
+                  </SubmitButton>
                 </form>
               )}
               {(order.status === "paid" || order.status === "ready") && (
                 <form action={setOrderCompleted}>
                   <input type="hidden" name="id" value={order.id} />
                   <SubmitButton className="button button--dark">
-                    {order.fulfillment === "delivery" ? "Marquer comme livrée" : "Marquer comme remise"}
+                    {order.fulfillment === "delivery"
+                      ? "Marquer comme livrée"
+                      : "Marquer comme remise"}
                   </SubmitButton>
                 </form>
               )}
@@ -194,12 +246,17 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
                 <form action={cancelOrder}>
                   <input type="hidden" name="id" value={order.id} />
                   <p className="field__hint">
-                    Le client n’a pas terminé son paiement. Aucun montant n’a été prélevé.
+                    Le client n’a pas terminé son paiement. Aucun montant n’a
+                    été prélevé.
                   </p>
-                  <ConfirmButton message="Annuler cette commande non payée ?">Annuler la commande</ConfirmButton>
+                  <ConfirmButton message="Annuler cette commande non payée ?">
+                    Annuler la commande
+                  </ConfirmButton>
                 </form>
               )}
-              {(order.status === "completed" || order.status === "cancelled" || order.status === "refunded") && (
+              {(order.status === "completed" ||
+                order.status === "cancelled" ||
+                order.status === "refunded") && (
                 <p className="field__hint">Cette commande est terminée.</p>
               )}
             </div>
@@ -210,7 +267,11 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
             <div className="order-steps">
               <form action={archiveOrder}>
                 <input type="hidden" name="id" value={order.id} />
-                <input type="hidden" name="archived" value={order.archivedAt ? "false" : "true"} />
+                <input
+                  type="hidden"
+                  name="archived"
+                  value={order.archivedAt ? "false" : "true"}
+                />
                 <p className="field__hint">
                   {order.archivedAt
                     ? "Cette commande est archivée : elle n’apparaît plus dans les listes."
@@ -220,18 +281,26 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
                   {order.archivedAt ? "Désarchiver" : "Archiver"}
                 </SubmitButton>
               </form>
-              {paidStatuses.includes(order.status) ? (
+              {!order.archivedAt ? (
                 <p className="field__hint">
-                  Pour supprimer une commande payée créée par erreur, remboursez-la d’abord.
+                  Pour supprimer cette commande, archivez-la d’abord : la
+                  suppression se fait depuis les archives.
+                </p>
+              ) : paidStatuses.includes(order.status) ? (
+                <p className="field__hint">
+                  Cette commande est payée : remboursez-la pour pouvoir la
+                  supprimer. Elle reste archivée en attendant.
                 </p>
               ) : (
                 <form action={removeOrder}>
                   <input type="hidden" name="id" value={order.id} />
-                  <p className="field__hint">Pour une commande créée par erreur ou un essai.</p>
+                  <p className="field__hint">
+                    Pour une commande créée par erreur ou un essai.
+                  </p>
                   <ConfirmButton
                     message={`Supprimer définitivement la commande ${order.number} ? Cette action est irréversible.`}
                   >
-                    Supprimer la commande
+                    Supprimer définitivement
                   </ConfirmButton>
                 </form>
               )}
@@ -244,16 +313,24 @@ async function OrderDetail({ params }: { params: PageProps<"/admin/commandes/[id
               <li>Créée le {formatDate(order.createdAt)}</li>
               {order.paidAt && <li>Payée le {formatDate(order.paidAt)}</li>}
               {order.readyAt && <li>Prête le {formatDate(order.readyAt)}</li>}
-              {order.completedAt && <li>Complétée le {formatDate(order.completedAt)}</li>}
+              {order.completedAt && (
+                <li>Complétée le {formatDate(order.completedAt)}</li>
+              )}
               {order.cancelledAt && (
                 <li>
-                  {order.status === "refunded" ? "Remboursée" : "Annulée"} le {formatDate(order.cancelledAt)}
+                  {order.status === "refunded" ? "Remboursée" : "Annulée"} le{" "}
+                  {formatDate(order.cancelledAt)}
                 </li>
               )}
             </ul>
             {order.stripePaymentIntentId && (
               <p style={{ marginTop: 16 }}>
-                <a className="link-button" href={stripePaymentUrl(order.stripePaymentIntentId)} target="_blank" rel="noreferrer">
+                <a
+                  className="link-button"
+                  href={stripePaymentUrl(order.stripePaymentIntentId)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Voir le paiement dans Stripe ↗
                 </a>
               </p>
