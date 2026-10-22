@@ -9,12 +9,14 @@ import { redirect } from "next/navigation";
 import {
   clearFailures,
   createSession,
+  destroyOtherSessions,
   destroySession,
   hashPassword,
   passwordProblem,
   recordFailure,
   requireAdmin,
   tooManyAttempts,
+  verifyAgainstDummy,
   verifyPassword,
 } from "@/lib/auth";
 import { deleteCateringRequest, setCateringHandled } from "@/lib/catering";
@@ -52,23 +54,34 @@ function sameText(a: string, b: string) {
 
 // ---------- Connexion ----------
 
-export async function login(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function login(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   const email = text(formData, "email", 200).toLowerCase();
-  const password = typeof formData.get("password") === "string" ? String(formData.get("password")) : "";
+  const password =
+    typeof formData.get("password") === "string"
+      ? String(formData.get("password"))
+      : "";
   const list = await headers();
-  const ip = list.get("x-forwarded-for")?.split(",")[0]?.trim() || list.get("x-real-ip") || "local";
+  const ip =
+    list.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    list.get("x-real-ip") ||
+    "local";
 
-  if (tooManyAttempts(ip)) {
+  const sql = await db();
+  if (await tooManyAttempts(sql, ip, email)) {
     return { error: "Trop de tentatives. Réessayez dans 15 minutes." };
   }
 
-  const sql = await db();
   let [user] = await sql<{ id: string; passwordHash: string }[]>`
     select id, password_hash from admin_users where email = ${email}
   `;
 
   if (!user) {
-    const [{ count }] = await sql<{ count: number }[]>`select count(*)::int as count from admin_users`;
+    const [{ count }] = await sql<
+      { count: number }[]
+    >`select count(*)::int as count from admin_users`;
     if (count === 0) {
       // Premier accès : le compte est créé à partir de ADMIN_EMAIL et ADMIN_PASSWORD.
       const bootstrapEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
@@ -90,12 +103,16 @@ export async function login(_previous: FormState, formData: FormData): Promise<F
     }
   }
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    recordFailure(ip);
+  // Même durée de calcul que le courriel existe ou non (voir verifyAgainstDummy).
+  const valid = user
+    ? await verifyPassword(password, user.passwordHash)
+    : await verifyAgainstDummy(password);
+  if (!user || !valid) {
+    await recordFailure(sql, ip, email);
     return { error: "Courriel ou mot de passe incorrect." };
   }
 
-  clearFailures(ip);
+  await clearFailures(sql, email);
   await sql`update admin_users set last_login_at = now() where id = ${user.id}`;
   await createSession(sql, user.id);
   redirect("/admin");
@@ -108,7 +125,10 @@ export async function logout() {
 
 // ---------- Produits ----------
 
-export async function saveProduct(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function saveProduct(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const sql = await db();
 
@@ -128,27 +148,45 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
   if (price === null || price <= 0 || price > 100_000) {
     return { error: "Indiquez un prix valide (ex. 12,50)." };
   }
-  if (stock !== null && (!Number.isInteger(stock) || stock < 0 || stock > 100_000)) {
-    return { error: "Le stock doit être un nombre entier (laisser vide pour un stock illimité)." };
+  if (
+    stock !== null &&
+    (!Number.isInteger(stock) || stock < 0 || stock > 100_000)
+  ) {
+    return {
+      error:
+        "Le stock doit être un nombre entier (laisser vide pour un stock illimité).",
+    };
   }
 
   let categoryId: string | null = null;
   if (categoryInput) {
     const [category] = isUuid(categoryInput)
-      ? await sql<{ id: string }[]>`select id from categories where id = ${categoryInput}`
+      ? await sql<
+          { id: string }[]
+        >`select id from categories where id = ${categoryInput}`
       : [];
-    if (!category) return { error: "Cette catégorie n’existe plus. Choisissez-en une autre." };
+    if (!category)
+      return {
+        error: "Cette catégorie n’existe plus. Choisissez-en une autre.",
+      };
     categoryId = category.id;
   }
 
   let imageId: string | undefined;
   if (image instanceof File && image.size > 0) {
-    if (image.size > MAX_UPLOAD_BYTES) return { error: "L’image dépasse 10 Mo." };
-    if (!isAcceptedImage(image)) return { error: "Format d’image non pris en charge (JPEG, PNG ou WebP)." };
+    if (image.size > MAX_UPLOAD_BYTES)
+      return { error: "L’image dépasse 10 Mo." };
+    if (!isAcceptedImage(image))
+      return {
+        error: "Format d’image non pris en charge (JPEG, PNG ou WebP).",
+      };
     try {
       imageId = await storeImage(sql, await image.arrayBuffer());
     } catch {
-      return { error: "Cette image n’a pas pu être lue. Essayez un fichier JPEG ou PNG." };
+      return {
+        error:
+          "Cette image n’a pas pu être lue. Essayez un fichier JPEG ou PNG.",
+      };
     }
   }
 
@@ -205,7 +243,11 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
 /** Enregistre l’ordre des produits dans l’épicerie : la position suit la place dans la liste. */
 export async function reorderProducts(ids: string[]) {
   await requireAdmin();
-  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string" && isUuid(id))) return;
+  if (
+    !Array.isArray(ids) ||
+    !ids.every((id) => typeof id === "string" && isUuid(id))
+  )
+    return;
   const sql = await db();
   await sql.begin(async (tx) => {
     for (const [position, id] of ids.entries()) {
@@ -241,14 +283,18 @@ export async function deleteProduct(formData: FormData) {
     const [deleted] = await sql<{ imageId: string | null }[]>`
       delete from products where id = ${id} returning image_id
     `;
-    if (deleted?.imageId) await sql`delete from media where id = ${deleted.imageId}`;
+    if (deleted?.imageId)
+      await sql`delete from media where id = ${deleted.imageId}`;
   }
   redirect("/admin/produits");
 }
 
 // ---------- Catégories ----------
 
-export async function saveCategory(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function saveCategory(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const sql = await db();
   const id = text(formData, "id", 60);
@@ -290,7 +336,11 @@ export async function saveCategory(_previous: FormState, formData: FormData): Pr
 /** Enregistre l’ordre des onglets : la position de chaque catégorie suit sa place dans la liste. */
 export async function reorderCategories(ids: string[]) {
   await requireAdmin();
-  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string" && isUuid(id))) return;
+  if (
+    !Array.isArray(ids) ||
+    !ids.every((id) => typeof id === "string" && isUuid(id))
+  )
+    return;
   const sql = await db();
   await sql.begin(async (tx) => {
     for (const [position, id] of ids.entries()) {
@@ -332,7 +382,10 @@ export async function setOrderCompleted(formData: FormData) {
   refresh();
 }
 
-export async function refund(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function refund(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const sql = await db();
   try {
@@ -360,7 +413,11 @@ export async function cancelOrder(formData: FormData) {
 export async function archiveOrder(formData: FormData) {
   await requireAdmin();
   const sql = await db();
-  await setOrderArchived(sql, orderId(formData), formData.get("archived") !== "false");
+  await setOrderArchived(
+    sql,
+    orderId(formData),
+    formData.get("archived") !== "false",
+  );
   refresh();
 }
 
@@ -387,7 +444,10 @@ export async function removeCateringRequest(formData: FormData) {
   refresh();
 }
 
-export async function saveOrderNote(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function saveOrderNote(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const sql = await db();
   await updateAdminNote(sql, orderId(formData), text(formData, "note", 2000));
@@ -397,15 +457,22 @@ export async function saveOrderNote(_previous: FormState, formData: FormData): P
 
 // ---------- Paramètres ----------
 
-export async function saveSettings(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function saveSettings(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const sql = await db();
   const current = await getSettings(sql);
   const fee = parseMoney(text(formData, "deliveryFee", 20) || "0");
-  if (fee === null || fee > 100_000) return { error: "Frais de livraison invalides (ex. 8,00)." };
+  if (fee === null || fee > 100_000)
+    return { error: "Frais de livraison invalides (ex. 8,00)." };
 
   const notificationEmail = text(formData, "notificationEmail", 200);
-  if (notificationEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) {
+  if (
+    notificationEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)
+  ) {
     return { error: "Adresse courriel des avis de commande invalide." };
   }
 
@@ -413,8 +480,10 @@ export async function saveSettings(_previous: FormState, formData: FormData): Pr
     ...current,
     shopVisible: checked(formData, "shopVisible"),
     shopOpen: checked(formData, "shopOpen"),
-    closedMessage: text(formData, "closedMessage", 300) || current.closedMessage,
-    closedMessageEn: text(formData, "closedMessageEn", 300) || current.closedMessageEn,
+    closedMessage:
+      text(formData, "closedMessage", 300) || current.closedMessage,
+    closedMessageEn:
+      text(formData, "closedMessageEn", 300) || current.closedMessageEn,
     pickupEnabled: checked(formData, "pickupEnabled"),
     pickupInstructions: text(formData, "pickupInstructions", 600),
     pickupInstructionsEn: text(formData, "pickupInstructionsEn", 600),
@@ -438,7 +507,10 @@ export async function saveSettings(_previous: FormState, formData: FormData): Pr
 
 // ---------- Comptes ----------
 
-export async function changePassword(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function changePassword(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   const admin = await requireAdmin();
   const current = String(formData.get("current") ?? "");
   const next = String(formData.get("next") ?? "");
@@ -456,15 +528,23 @@ export async function changePassword(_previous: FormState, formData: FormData): 
     return { error: "Le mot de passe actuel est incorrect." };
   }
   await sql`update admin_users set password_hash = ${await hashPassword(next)} where id = ${admin.id}`;
-  return { success: "Mot de passe modifié." };
+  // Une session volée ou oubliée sur un autre appareil ne survit pas au changement de mot de passe.
+  await destroyOtherSessions(sql, admin.id);
+  return {
+    success: "Mot de passe modifié. Vos autres appareils ont été déconnectés.",
+  };
 }
 
-export async function createAdmin(_previous: FormState, formData: FormData): Promise<FormState> {
+export async function createAdmin(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
   const email = text(formData, "email", 200).toLowerCase();
   const name = text(formData, "name", 100);
   const password = String(formData.get("password") ?? "");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Adresse courriel invalide." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return { error: "Adresse courriel invalide." };
   const problem = passwordProblem(password);
   if (problem) return { error: problem };
 
@@ -475,7 +555,8 @@ export async function createAdmin(_previous: FormState, formData: FormData): Pro
     on conflict (email) do nothing
     returning id
   `;
-  if (created.length === 0) return { error: "Un compte existe déjà avec cette adresse." };
+  if (created.length === 0)
+    return { error: "Un compte existe déjà avec cette adresse." };
   refresh();
   return { success: `Accès créé pour ${email}.` };
 }

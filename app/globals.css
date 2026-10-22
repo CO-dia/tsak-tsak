@@ -2180,6 +2180,21 @@ h1 {
   width: 1px;
 }
 
+.field-error {
+  color: var(--coral);
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.event-form__error--box {
+  background: rgba(169, 58, 44, 0.08);
+  border: 1px solid var(--coral);
+  padding: 12px 14px;
+}
+
 .event-form__error {
   color: var(--coral);
   font-size: 13px;

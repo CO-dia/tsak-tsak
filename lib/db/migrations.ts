@@ -162,4 +162,16 @@ export const migrations: { id: string; sql: string }[] = [
       create index catering_requests_created_idx on catering_requests (created_at desc);
     `,
   },
+  {
+    id: "005_tentatives_connexion",
+    sql: /* sql */ `
+      create table login_attempts (
+        id bigserial primary key,
+        key text not null,
+        created_at timestamptz not null default now()
+      );
+
+      create index login_attempts_key_idx on login_attempts (key, created_at);
+    `,
+  },
 ];

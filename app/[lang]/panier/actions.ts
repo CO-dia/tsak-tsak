@@ -5,33 +5,26 @@ import { redirect } from "next/navigation";
 
 import { createCheckout, MAX_QUANTITY } from "@/lib/checkout";
 import { db } from "@/lib/db";
+import { getDictionary } from "@/lib/dictionaries";
 import type { Locale } from "@/lib/i18n";
 import type { DeliveryAddress } from "@/lib/orders";
 import { isUuid } from "@/lib/products";
 import { shopHidden } from "@/lib/shop-status";
 
-export type CheckoutFormState = { error?: string };
+export type CheckoutFormState = {
+  error?: string;
+  /** Champ concerné (name, email, phone, line1, city, postalCode), pour l’afficher à côté du champ. */
+  field?: string;
+};
 
 const messages = {
   fr: {
     soon: "L’épicerie sera bientôt disponible.",
     empty: "Votre panier est vide.",
-    name: "Indiquez votre nom.",
-    email: "Indiquez une adresse courriel valide.",
-    phone: "Indiquez un numéro de téléphone (10 chiffres).",
-    address: "Indiquez l’adresse de livraison.",
-    city: "Indiquez la ville de livraison.",
-    postalCode: "Indiquez un code postal valide (ex. H2S 1R4).",
   },
   en: {
     soon: "The shop will be available soon.",
     empty: "Your cart is empty.",
-    name: "Please enter your name.",
-    email: "Please enter a valid email address.",
-    phone: "Please enter a phone number (10 digits).",
-    address: "Please enter the delivery address.",
-    city: "Please enter the delivery city.",
-    postalCode: "Please enter a valid postal code (e.g. H2S 1R4).",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
@@ -82,6 +75,7 @@ export async function startCheckout(
 ): Promise<CheckoutFormState> {
   const locale: Locale = text(formData, "lang") === "en" ? "en" : "fr";
   const t = messages[locale];
+  const e = getDictionary(locale).cart;
   if (await shopHidden(await db())) return { error: t.soon };
   const items = parseItems(text(formData, "cart", 10_000));
   if (items.length === 0) return { error: t.empty };
@@ -91,12 +85,12 @@ export async function startCheckout(
     email: text(formData, "email", 160).toLowerCase(),
     phone: text(formData, "phone", 40),
   };
-  if (customer.name.length < 2) return { error: t.name };
+  if (customer.name.length < 2) return { error: e.errName, field: "name" };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) {
-    return { error: t.email };
+    return { error: e.errEmail, field: "email" };
   }
   if (customer.phone.replace(/\D/g, "").length < 10) {
-    return { error: t.phone };
+    return { error: e.errPhone, field: "phone" };
   }
 
   const fulfillment =
@@ -125,10 +119,11 @@ export async function startCheckout(
         ? { lat, lng }
         : {}),
     };
-    if (address.line1.length < 4) return { error: t.address };
-    if (address.city.length < 2) return { error: t.city };
+    if (address.line1.length < 4)
+      return { error: e.errAddress, field: "line1" };
+    if (address.city.length < 2) return { error: e.errCity, field: "city" };
     if (!POSTAL_CODE.test(address.postalCode)) {
-      return { error: t.postalCode };
+      return { error: e.errPostalCode, field: "postalCode" };
     }
   }
 
