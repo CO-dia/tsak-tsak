@@ -4,10 +4,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createCheckout, MAX_QUANTITY } from "@/lib/checkout";
+import { db } from "@/lib/db";
 import type { Locale } from "@/lib/i18n";
 import type { DeliveryAddress } from "@/lib/orders";
 import { isUuid } from "@/lib/products";
-import { shopComingSoon } from "@/lib/shop-status";
+import { shopHidden } from "@/lib/shop-status";
 
 export type CheckoutFormState = { error?: string };
 
@@ -34,7 +35,8 @@ const messages = {
   },
 } satisfies Record<Locale, Record<string, string>>;
 
-const POSTAL_CODE = /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d$/;
+const POSTAL_CODE =
+  /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d$/;
 
 function text(formData: FormData, name: string, max = 200) {
   const value = formData.get(name);
@@ -66,8 +68,11 @@ async function siteOrigin() {
   const list = await headers();
   const origin = list.get("origin");
   if (origin) return origin;
-  const host = list.get("x-forwarded-host") ?? list.get("host") ?? "localhost:3000";
-  const protocol = list.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const host =
+    list.get("x-forwarded-host") ?? list.get("host") ?? "localhost:3000";
+  const protocol =
+    list.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
 }
 
@@ -77,7 +82,7 @@ export async function startCheckout(
 ): Promise<CheckoutFormState> {
   const locale: Locale = text(formData, "lang") === "en" ? "en" : "fr";
   const t = messages[locale];
-  if (shopComingSoon()) return { error: t.soon };
+  if (await shopHidden(await db())) return { error: t.soon };
   const items = parseItems(text(formData, "cart", 10_000));
   if (items.length === 0) return { error: t.empty };
 
@@ -94,11 +99,14 @@ export async function startCheckout(
     return { error: t.phone };
   }
 
-  const fulfillment = text(formData, "fulfillment") === "delivery" ? "delivery" : "pickup";
+  const fulfillment =
+    text(formData, "fulfillment") === "delivery" ? "delivery" : "pickup";
   let address: DeliveryAddress | null = null;
 
   if (fulfillment === "delivery") {
-    const postalCode = text(formData, "postalCode", 10).toUpperCase().replace(/\s+/g, " ");
+    const postalCode = text(formData, "postalCode", 10)
+      .toUpperCase()
+      .replace(/\s+/g, " ");
     const lat = Number(text(formData, "lat", 30));
     const lng = Number(text(formData, "lng", 30));
     address = {
@@ -106,9 +114,16 @@ export async function startCheckout(
       line2: text(formData, "line2", 100),
       city: text(formData, "city", 100),
       province: text(formData, "province", 30) || "QC",
-      postalCode: postalCode.length === 6 ? `${postalCode.slice(0, 3)} ${postalCode.slice(3)}` : postalCode,
-      ...(text(formData, "placeId", 300) ? { placeId: text(formData, "placeId", 300) } : {}),
-      ...(Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 ? { lat, lng } : {}),
+      postalCode:
+        postalCode.length === 6
+          ? `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`
+          : postalCode,
+      ...(text(formData, "placeId", 300)
+        ? { placeId: text(formData, "placeId", 300) }
+        : {}),
+      ...(Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0
+        ? { lat, lng }
+        : {}),
     };
     if (address.line1.length < 4) return { error: t.address };
     if (address.city.length < 2) return { error: t.city };

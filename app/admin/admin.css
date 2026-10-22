@@ -942,3 +942,22 @@ a.stat:hover {
 .admin-section__title {
   margin: 0 0 20px;
 }
+
+.row-handle {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-handle .link-button:disabled {
+  opacity: 0.3;
+}
+
+.admin-table tr.is-dragging {
+  opacity: 0.4;
+}
+
+.admin-table tr.is-over {
+  box-shadow: 0 -2px 0 var(--olive);
+}

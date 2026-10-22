@@ -62,7 +62,6 @@ async function EditProduct({ params }: { params: PageProps<"/admin/produits/[id]
           descriptionEn: product.descriptionEn,
           price: centsToInput(product.priceCents),
           stock: product.stock === null ? "" : String(product.stock),
-          position: String(product.position),
           isActive: product.isActive,
           isTaxable: product.isTaxable,
           imageUrl: product.imageId ? mediaUrl(product.imageId) : null,

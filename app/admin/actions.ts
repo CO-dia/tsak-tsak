@@ -122,7 +122,6 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
   const price = parseMoney(text(formData, "price", 20));
   const stockInput = text(formData, "stock", 10);
   const stock = stockInput === "" ? null : Number(stockInput);
-  const position = Number(text(formData, "position", 10) || "0");
   const image = formData.get("image");
 
   if (name.length < 2) return { error: "Indiquez le nom du produit." };
@@ -132,7 +131,6 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
   if (stock !== null && (!Number.isInteger(stock) || stock < 0 || stock > 100_000)) {
     return { error: "Le stock doit être un nombre entier (laisser vide pour un stock illimité)." };
   }
-  if (!Number.isInteger(position)) return { error: "L’ordre d’affichage doit être un nombre entier." };
 
   let categoryId: string | null = null;
   if (categoryInput) {
@@ -163,7 +161,6 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
     categoryId,
     priceCents: price,
     stock,
-    position,
     isActive: checked(formData, "isActive"),
     isTaxable: checked(formData, "isTaxable"),
   };
@@ -179,7 +176,7 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
         name = ${values.name}, name_en = ${values.nameEn}, format = ${values.format},
         description = ${values.description}, description_en = ${values.descriptionEn},
         category_id = ${values.categoryId},
-        price_cents = ${values.priceCents}, stock = ${values.stock}, position = ${values.position},
+        price_cents = ${values.priceCents}, stock = ${values.stock},
         is_active = ${values.isActive}, is_taxable = ${values.isTaxable},
         image_id = ${imageId ?? previous.imageId}, updated_at = now()
       where id = ${id}
@@ -197,12 +194,25 @@ export async function saveProduct(_previous: FormState, formData: FormData): Pro
                             price_cents, stock, position, is_active, is_taxable, image_id)
       values (${taken ? `${base}-${taken + 1}` : base}, ${values.name}, ${values.nameEn}, ${values.format},
               ${values.description}, ${values.descriptionEn}, ${values.categoryId},
-              ${values.priceCents}, ${values.stock}, ${values.position}, ${values.isActive}, ${values.isTaxable},
+              ${values.priceCents}, ${values.stock}, (select coalesce(max(position) + 1, 0) from products), ${values.isActive}, ${values.isTaxable},
               ${imageId ?? null})
     `;
   }
 
   redirect("/admin/produits");
+}
+
+/** Enregistre l’ordre des produits dans l’épicerie : la position suit la place dans la liste. */
+export async function reorderProducts(ids: string[]) {
+  await requireAdmin();
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string" && isUuid(id))) return;
+  const sql = await db();
+  await sql.begin(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx`update products set position = ${position} where id = ${id}`;
+    }
+  });
+  refresh();
 }
 
 export async function toggleProduct(formData: FormData) {
@@ -401,6 +411,7 @@ export async function saveSettings(_previous: FormState, formData: FormData): Pr
 
   const next = {
     ...current,
+    shopVisible: checked(formData, "shopVisible"),
     shopOpen: checked(formData, "shopOpen"),
     closedMessage: text(formData, "closedMessage", 300) || current.closedMessage,
     closedMessageEn: text(formData, "closedMessageEn", 300) || current.closedMessageEn,

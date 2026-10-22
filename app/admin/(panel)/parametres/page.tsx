@@ -32,8 +32,17 @@ async function SettingsForm() {
     <ActionForm action={saveSettings} className="admin-card admin-form">
       <div className="form-section">
         <h2>Boutique</h2>
-        <p>Fermez la boutique pour suspendre les commandes sans retirer les produits.</p>
+        <p>Masquez l’épicerie, ou fermez la boutique pour suspendre les commandes sans retirer les produits.</p>
       </div>
+      <label className="toggle field--wide">
+        <input type="checkbox" name="shopVisible" defaultChecked={settings.shopVisible} />
+        <span>
+          <strong>Afficher l’épicerie sur le site</strong>
+          <small>
+            Décoché, l’épicerie et le panier affichent « bientôt disponible » et aucun paiement n’est possible.
+          </small>
+        </span>
+      </label>
       <label className="toggle field--wide">
         <input type="checkbox" name="shopOpen" defaultChecked={settings.shopOpen} />
         <span>

@@ -16,7 +16,6 @@ export type ProductFormValues = {
   descriptionEn: string;
   price: string;
   stock: string;
-  position: string;
   isActive: boolean;
   isTaxable: boolean;
   imageUrl: string | null;
@@ -37,16 +36,35 @@ export default function ProductForm({
 
       <label className="field">
         <span>Nom du produit</span>
-        <input name="name" type="text" defaultValue={product.name} required maxLength={120} />
+        <input
+          name="name"
+          type="text"
+          defaultValue={product.name}
+          required
+          maxLength={120}
+        />
       </label>
       <label className="field">
         <span>Nom en anglais</span>
-        <input name="nameEn" type="text" defaultValue={product.nameEn} maxLength={120} lang="en" />
-        <p className="field__hint">Version anglaise du site. Laisser vide pour garder le nom français.</p>
+        <input
+          name="nameEn"
+          type="text"
+          defaultValue={product.nameEn}
+          maxLength={120}
+          lang="en"
+        />
+        <p className="field__hint">
+          Version anglaise du site. Laisser vide pour garder le nom français.
+        </p>
       </label>
       <label className="field">
         <span>Description</span>
-        <textarea name="description" defaultValue={product.description} rows={4} maxLength={1000} />
+        <textarea
+          name="description"
+          defaultValue={product.description}
+          rows={4}
+          maxLength={1000}
+        />
       </label>
       <label className="field">
         <span>Description en anglais</span>
@@ -60,11 +78,24 @@ export default function ProductForm({
       </label>
       <label className="field">
         <span>Prix ($)</span>
-        <input name="price" type="text" inputMode="decimal" defaultValue={product.price} placeholder="12,50" required />
+        <input
+          name="price"
+          type="text"
+          inputMode="decimal"
+          defaultValue={product.price}
+          placeholder="12,50"
+          required
+        />
       </label>
       <label className="field">
         <span>Format</span>
-        <input name="format" type="text" defaultValue={product.format} placeholder="250 ml, 400 g, coffret…" maxLength={60} />
+        <input
+          name="format"
+          type="text"
+          defaultValue={product.format}
+          placeholder="250 ml, 400 g, coffret…"
+          maxLength={60}
+        />
       </label>
       <label className="field">
         <span>Catégorie</span>
@@ -77,13 +108,23 @@ export default function ProductForm({
           ))}
         </select>
         <p className="field__hint">
-          Onglet de l’épicerie où le produit apparaît. <Link href="/admin/produits#categories">Gérer les catégories</Link>
+          Onglet de l’épicerie où le produit apparaît.{" "}
+          <Link href="/admin/produits#categories">Gérer les catégories</Link>
         </p>
       </label>
       <label className="field">
         <span>Stock</span>
-        <input name="stock" type="number" min={0} step={1} defaultValue={product.stock} placeholder="Illimité" />
-        <p className="field__hint">Laisser vide si vous ne suivez pas le stock de ce produit.</p>
+        <input
+          name="stock"
+          type="number"
+          min={0}
+          step={1}
+          defaultValue={product.stock}
+          placeholder="Illimité"
+        />
+        <p className="field__hint">
+          Laisser vide si vous ne suivez pas le stock de ce produit.
+        </p>
       </label>
 
       <div className="field field--wide">
@@ -94,7 +135,9 @@ export default function ProductForm({
             // eslint-disable-next-line @next/next/no-img-element
             <img className="image-input__preview" src={preview} alt="" />
           ) : (
-            <span className="image-input__preview image-input__empty">Aucune photo</span>
+            <span className="image-input__preview image-input__empty">
+              Aucune photo
+            </span>
           )}
           <div className="field">
             <input
@@ -107,36 +150,45 @@ export default function ProductForm({
               }}
             />
             <p className="field__hint">
-              JPEG, PNG ou WebP, 10 Mo au plus. Format portrait conseillé. L’image est recadrée et
-              optimisée automatiquement.
+              JPEG, PNG ou WebP, 10 Mo au plus. Format portrait conseillé.
+              L’image est recadrée et optimisée automatiquement.
             </p>
           </div>
         </div>
       </div>
 
-      <label className="field">
-        <span>Ordre d’affichage</span>
-        <input name="position" type="number" step={1} defaultValue={product.position} />
-        <p className="field__hint">Les plus petits nombres s’affichent en premier.</p>
-      </label>
-
       <label className="toggle">
-        <input type="checkbox" name="isActive" defaultChecked={product.isActive} />
+        <input
+          type="checkbox"
+          name="isActive"
+          defaultChecked={product.isActive}
+        />
         <span>
           <strong>Visible sur le site</strong>
-          <small>Décochez pour retirer temporairement le produit de l’épicerie.</small>
+          <small>
+            Décochez pour retirer temporairement le produit de l’épicerie.
+          </small>
         </span>
       </label>
       <label className="toggle">
-        <input type="checkbox" name="isTaxable" defaultChecked={product.isTaxable} />
+        <input
+          type="checkbox"
+          name="isTaxable"
+          defaultChecked={product.isTaxable}
+        />
         <span>
           <strong>Produit taxable (TPS et TVQ)</strong>
-          <small>Utilisé seulement si la perception des taxes est activée dans les paramètres.</small>
+          <small>
+            Utilisé seulement si la perception des taxes est activée dans les
+            paramètres.
+          </small>
         </span>
       </label>
 
       <div className="form-footer">
-        <SubmitButton>{product.id ? "Enregistrer les modifications" : "Ajouter le produit"}</SubmitButton>
+        <SubmitButton>
+          {product.id ? "Enregistrer les modifications" : "Ajouter le produit"}
+        </SubmitButton>
       </div>
     </ActionForm>
   );

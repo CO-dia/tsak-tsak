@@ -12,10 +12,12 @@ import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale, type Locale } from "@/lib/i18n";
 import { listActiveProducts, toPublicProduct } from "@/lib/products";
 import { alternates } from "@/lib/seo";
-import { shopComingSoon } from "@/lib/shop-status";
+import { shopHidden } from "@/lib/shop-status";
 import { getSettings, localizedSettings } from "@/lib/settings";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/panier">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[lang]/panier">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   return {
@@ -25,14 +27,23 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/panier">):
   };
 }
 
-export default async function CartPage({ params, searchParams }: PageProps<"/[lang]/panier">) {
+export default async function CartPage({
+  params,
+  searchParams,
+}: PageProps<"/[lang]/panier">) {
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const t = getDictionary(lang).cart;
 
   return (
     <>
-      <PageHero compact index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
+      <PageHero
+        compact
+        index={t.index}
+        eyebrow={t.eyebrow}
+        title={t.title}
+        description={t.description}
+      />
       <section className="section cart-page">
         <Suspense fallback={<p className="shop-status">{t.loading}</p>}>
           <Checkout lang={lang} searchParams={searchParams} />
@@ -50,10 +61,13 @@ async function Checkout({
   searchParams: PageProps<"/[lang]/panier">["searchParams"];
 }) {
   await connection();
-  if (shopComingSoon()) return <ComingSoon lang={lang} />;
   const { paiement } = await searchParams;
   const sql = await db();
-  const [products, settings] = await Promise.all([listActiveProducts(sql), getSettings(sql)]);
+  if (await shopHidden(sql)) return <ComingSoon lang={lang} />;
+  const [products, settings] = await Promise.all([
+    listActiveProducts(sql),
+    getSettings(sql),
+  ]);
   const texts = localizedSettings(settings, lang);
 
   return (

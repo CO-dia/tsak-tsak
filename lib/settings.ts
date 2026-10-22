@@ -3,6 +3,8 @@ import "server-only";
 import type { Queryable } from "@/lib/db";
 
 export type ShopSettings = {
+  /** L’épicerie et le panier sont affichés ; sinon « bientôt disponible » à leur place. */
+  shopVisible: boolean;
   /** La boutique accepte les commandes. */
   shopOpen: boolean;
   closedMessage: string;
@@ -24,6 +26,7 @@ export type ShopSettings = {
 };
 
 export const defaultSettings: ShopSettings = {
+  shopVisible: true,
   shopOpen: true,
   closedMessage: "La boutique en ligne est fermée pour le moment. Revenez bientôt!",
   closedMessageEn: "Our online shop is closed for the moment. Come back soon!",

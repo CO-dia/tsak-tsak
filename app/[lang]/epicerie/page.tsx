@@ -11,26 +11,46 @@ import { db } from "@/lib/db";
 import { getDictionary } from "@/lib/dictionaries";
 import { hasLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
-import { categoryName, listActiveProducts, listCategories, toPublicProduct } from "@/lib/products";
+import {
+  categoryName,
+  listActiveProducts,
+  listCategories,
+  toPublicProduct,
+} from "@/lib/products";
 import { pageMetadata } from "@/lib/seo";
-import { shopComingSoon } from "@/lib/shop-status";
+import { shopHidden } from "@/lib/shop-status";
 import { getSettings, localizedSettings } from "@/lib/settings";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/epicerie">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[lang]/epicerie">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDictionary(lang).shop;
-  return pageMetadata({ lang, route: "shop", title: t.metaTitle, description: t.metaDescription });
+  return pageMetadata({
+    lang,
+    route: "shop",
+    title: t.metaTitle,
+    description: t.metaDescription,
+  });
 }
 
-export default async function ShopPage({ params, searchParams }: PageProps<"/[lang]/epicerie">) {
+export default async function ShopPage({
+  params,
+  searchParams,
+}: PageProps<"/[lang]/epicerie">) {
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const t = getDictionary(lang).shop;
 
   return (
     <>
-      <PageHero index={t.index} eyebrow={t.eyebrow} title={t.title} description={t.description} />
+      <PageHero
+        index={t.index}
+        eyebrow={t.eyebrow}
+        title={t.title}
+        description={t.description}
+      />
       <section className="shop section shop--page">
         <Suspense fallback={<p className="shop-status">{t.loading}</p>}>
           <Catalog lang={lang} searchParams={searchParams} />
@@ -38,7 +58,12 @@ export default async function ShopPage({ params, searchParams }: PageProps<"/[la
       </section>
       <CartBar
         lang={lang}
-        labels={{ bar: t.bar, item: t.barItem, items: t.barItems, checkout: t.checkout }}
+        labels={{
+          bar: t.bar,
+          item: t.barItem,
+          items: t.barItems,
+          checkout: t.checkout,
+        }}
       />
     </>
   );
@@ -47,11 +72,21 @@ export default async function ShopPage({ params, searchParams }: PageProps<"/[la
 function Icon({ name }: { name: "store" | "truck" | "lock" }) {
   const paths = {
     store: "M4 10.5 5.5 5h13L20 10.5M5 10.5V19h14v-8.5M4 10.5h16M10 19v-5h4v5",
-    truck: "M3 7h11v9H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+    truck:
+      "M3 7h11v9H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
     lock: "M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3",
   };
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    >
       <path d={paths[name]} />
     </svg>
   );
@@ -67,12 +102,13 @@ async function Catalog({
   // Lu à chaque requête (stock et prix toujours à jour), jamais pendant le build.
   await connection();
   const t = getDictionary(lang).shop;
-  if (shopComingSoon()) return <ComingSoon lang={lang} />;
   const { categorie } = await searchParams;
 
   let data;
+  let hidden = false;
   try {
     const sql = await db();
+    hidden = await shopHidden(sql);
     const [products, categories, settings] = await Promise.all([
       listActiveProducts(sql),
       listCategories(sql),
@@ -84,10 +120,16 @@ async function Catalog({
     return <p className="shop-status">{t.unavailable}</p>;
   }
 
+  if (hidden) return <ComingSoon lang={lang} />;
+
   const { products, categories, settings } = data;
   const texts = localizedSettings(settings, lang);
   const info = [
-    settings.pickupEnabled && { icon: "store" as const, title: t.pickupTitle, text: t.pickupText },
+    settings.pickupEnabled && {
+      icon: "store" as const,
+      title: t.pickupTitle,
+      text: t.pickupText,
+    },
     settings.deliveryEnabled && {
       icon: "truck" as const,
       title: t.deliveryTitle,
@@ -112,7 +154,9 @@ async function Catalog({
           </li>
         ))}
       </ul>
-      {!settings.shopOpen && <p className="shop-notice">{texts.closedMessage}</p>}
+      {!settings.shopOpen && (
+        <p className="shop-notice">{texts.closedMessage}</p>
+      )}
       <ShopCatalog
         lang={lang}
         products={products.map((product) => toPublicProduct(product, lang))}

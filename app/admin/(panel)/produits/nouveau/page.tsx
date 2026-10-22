@@ -44,7 +44,6 @@ async function NewProduct() {
         descriptionEn: "",
         price: "",
         stock: "",
-        position: "0",
         isActive: true,
         isTaxable: false,
         imageUrl: null,

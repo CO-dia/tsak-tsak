@@ -1,10 +1,20 @@
 import "server-only";
 
+import type { Queryable } from "@/lib/db";
+import { getSettings } from "@/lib/settings";
+
 /**
- * Mettre `SHOP_COMING_SOON=true` dans l’environnement pour afficher « bientôt disponible » à la
- * place de l’épicerie et du panier, et bloquer les paiements. Lu à chaque requête : on peut
- * l’activer ou le retirer sans reconstruire le site (redémarrer l’application suffit).
+ * Vrai quand l’épicerie et le panier affichent « bientôt disponible » (et que les paiements sont
+ * bloqués). Se règle depuis l’admin (Paramètres) ; `SHOP_COMING_SOON=true` dans l’environnement
+ * force aussi ce mode, quoi qu’indique l’admin. Lu à chaque requête.
  */
-export function shopComingSoon() {
-  return ["1", "true", "yes", "oui"].includes((process.env.SHOP_COMING_SOON ?? "").trim().toLowerCase());
+export async function shopHidden(sql: Queryable) {
+  if (
+    ["1", "true", "yes", "oui"].includes(
+      (process.env.SHOP_COMING_SOON ?? "").trim().toLowerCase(),
+    )
+  ) {
+    return true;
+  }
+  return !(await getSettings(sql)).shopVisible;
 }

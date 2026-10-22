@@ -2,14 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { toggleProduct } from "@/app/admin/actions";
 import CategoryManager from "@/components/admin/CategoryManager";
-import { SubmitButton } from "@/components/admin/forms";
+import ProductTable from "@/components/admin/ProductTable";
 import { AdminHeader, AdminLoading } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { mediaUrl } from "@/lib/media";
-import { formatMoney } from "@/lib/money";
 import { listAllProducts, listCategories } from "@/lib/products";
 
 export const metadata: Metadata = { title: "Produits" };
@@ -53,107 +51,23 @@ async function Products() {
           .
         </p>
       ) : (
-        <ProductTable products={products} categoryNames={categoryNames} />
+        <ProductTable
+          products={products.map((product) => ({
+            id: product.id,
+            name: product.name,
+            format: product.format,
+            isTaxable: product.isTaxable,
+            isActive: product.isActive,
+            priceCents: product.priceCents,
+            stock: product.stock,
+            categoryName:
+              (product.categoryId && categoryNames.get(product.categoryId)) ||
+              null,
+            imageSrc: product.imageId ? mediaUrl(product.imageId) : null,
+          }))}
+        />
       )}
       <CategoryManager categories={categories} />
     </>
-  );
-}
-
-function ProductTable({
-  products,
-  categoryNames,
-}: {
-  products: Awaited<ReturnType<typeof listAllProducts>>;
-  categoryNames: Map<string, string>;
-}) {
-  return (
-    <div className="admin-card admin-table-wrap">
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th aria-label="Image" />
-            <th>Produit</th>
-            <th>Catégorie</th>
-            <th className="num">Prix</th>
-            <th className="num">Stock</th>
-            <th>Sur le site</th>
-            <th aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((product) => (
-            <tr key={product.id}>
-              <td>
-                {product.imageId ? (
-                  // Miniature déjà optimisée côté serveur : pas besoin de next/image ici.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    className="admin-thumb"
-                    src={mediaUrl(product.imageId)}
-                    alt=""
-                  />
-                ) : (
-                  <span className="admin-thumb image-input__empty">—</span>
-                )}
-              </td>
-              <td>
-                <Link
-                  className="row-link"
-                  href={`/admin/produits/${product.id}`}
-                >
-                  {product.name}
-                </Link>
-                <br />
-                <span className="muted">
-                  {product.format || "—"}
-                  {product.isTaxable ? " · taxable" : ""}
-                </span>
-              </td>
-              <td>
-                {(product.categoryId &&
-                  categoryNames.get(product.categoryId)) || (
-                  <span className="muted">Sans catégorie</span>
-                )}
-              </td>
-              <td className="num">{formatMoney(product.priceCents)}</td>
-              <td className="num">
-                {product.stock === null ? (
-                  <span className="muted">Illimité</span>
-                ) : product.stock === 0 ? (
-                  <span className="badge badge--warning">Rupture</span>
-                ) : (
-                  product.stock
-                )}
-              </td>
-              <td>
-                <form action={toggleProduct}>
-                  <input type="hidden" name="id" value={product.id} />
-                  <SubmitButton className="link-button" pendingLabel="…">
-                    {product.isActive ? (
-                      <span className="badge badge--active">Visible</span>
-                    ) : (
-                      <span className="badge badge--hidden">Masqué</span>
-                    )}
-                  </SubmitButton>
-                </form>
-              </td>
-              <td className="num">
-                <Link
-                  className="link-button"
-                  href={`/admin/produits/${product.id}`}
-                >
-                  Modifier
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="field__hint" style={{ marginTop: 16 }}>
-        Cliquez sur « Visible » ou « Masqué » pour afficher ou retirer un
-        produit de l’épicerie.
-      </p>
-    </div>
   );
 }
