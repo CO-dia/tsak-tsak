@@ -411,3 +411,45 @@ export const menuSections: MenuSection[] = [
     ],
   },
 ];
+
+// Photos des plats (dossier public/menu). Une photo de plat s’affiche sur sa fiche ;
+// une photo de groupe s’affiche en grand à côté du groupe. Clé groupe : « id-section/titre FR ».
+export const itemPhotos: Record<string, string> = {
+  "Saumon chic": "saumon-chic",
+  "Côtes levées stylées": "cotes-levees",
+  "Bénédictines sauce aux truffes carnivore": "benedictines-carnivore",
+  "Bénédictines sauce aux truffes": "benedictines-truffes",
+  "Béné doré": "bene-dore",
+  "Toast bavette de boeuf": "toast-bavette",
+  "Vegan": "vegan",
+  "Poutine déjeuner": "poutine",
+  "Bagel bacon": "bagel-bacon",
+  "Toast à l’avocat": "toast-avocat",
+  "Burger avocado": "burger",
+};
+
+export const groupPhotos: Record<string, string> = {
+  "brunch/Omelettes": "omelette",
+  "brunch/Œufs": "oeufs",
+  "brunch/Sucré salé": "assiette-sucre-sale",
+  "brunch/Œufs bénédictines": "benedictines-1",
+  "crepes/Crêpes salées au sarrasin": "crepe-salee",
+  "crepes/Crêpes sucrées": "crepe-sucree",
+  "crepes/Pain doré": "pain-dore",
+  "crepes/Pancakes": "pancake",
+  "sandwichs/Salades": "salade",
+  "diner/Entrées": "entrees",
+  "diner/Poulets": "poulet",
+  "diner/Porcs": "porcs",
+  "diner/Bœufs": "boeufs",
+  "diner/Soupe": "soupe",
+  "soir/Entrées": "foie-gras",
+  "soir/Plats": "magret",
+  "desserts/Desserts maison": "brownie",
+  "desserts/Crêpes gourmandes": "profiterole",
+  "boissons/Cocktails": "mimosa",
+  "boissons/Meilleure limonade au monde": "limonade",
+  "boissons/Smoothies": "smoothie",
+  "boissons/Cafés": "cafe",
+  "boissons/Cafés stylés": "lattes",
+};
