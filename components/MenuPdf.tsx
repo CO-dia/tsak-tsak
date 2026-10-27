@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const PAGE_COUNT = 8;
 
@@ -21,22 +21,27 @@ export default function MenuPdf({
   labels,
 }: {
   sections: { id: string; label: string }[];
-  labels: { tabs: string; open: string; page: string };
+  labels: { tabs: string; open: string; page: string; close: string; nav: string };
 }) {
   const [current, setCurrent] = useState(1);
-  const [railVisible, setRailVisible] = useState(false);
-  const barRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [zoomPage, setZoomPage] = useState<number | null>(null);
 
-  // Le menu latéral apparaît dès que la barre du haut sort de l’écran.
+  // Sur téléphone le texte du PDF est petit : un appui sur une page l’ouvre en grand, à faire défiler.
   useEffect(() => {
-    const bar = barRef.current;
-    if (!bar) return;
-    const observer = new IntersectionObserver(([entry]) => setRailVisible(!entry.isIntersecting), {
-      rootMargin: "-90px 0px 0px 0px",
-    });
-    observer.observe(bar);
-    return () => observer.disconnect();
-  }, []);
+    if (zoomPage === null) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setZoomPage(null);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [zoomPage]);
+
+  const openZoom = (page: number) => {
+    if (window.matchMedia("(max-width: 900px)").matches) setZoomPage(page);
+  };
 
   // Met en avant le bouton de la section dont la page est à l’écran.
   useEffect(() => {
@@ -55,11 +60,14 @@ export default function MenuPdf({
 
   const entries = sections
     .map((section) => ({ ...section, page: pdfPages[section.id] }))
-    .filter((section) => section.page);
+    .filter((section) => section.page)
+    // Même ordre que dans le PDF.
+    .sort((a, b) => a.page - b.page);
   // La section active est celle dont la première page est la plus proche en dessous de la page affichée.
   const activeId = [...entries].filter((entry) => entry.page <= current).sort((a, b) => b.page - a.page)[0]?.id;
 
   const go = (page: number) => {
+    setOpen(false);
     document.getElementById(`menu-page-${page}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -76,23 +84,28 @@ export default function MenuPdf({
 
   return (
     <>
-      <div className="menu-tabs menu-tabs--pdf" ref={barRef}>
-        <div className="menu-tabs__scroll" role="navigation" aria-label={labels.tabs}>
-          {buttons}
-        </div>
-      </div>
-
-      <nav
-        className={railVisible ? "menu-rail menu-rail--visible" : "menu-rail"}
-        aria-label={labels.tabs}
-        aria-hidden={!railVisible}
+      <button
+        className="menu-fab"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
       >
+        {labels.nav}
+      </button>
+      {open && <div className="menu-rail-backdrop" onClick={() => setOpen(false)} />}
+      <nav className={open ? "menu-rail menu-rail--open" : "menu-rail"} aria-label={labels.tabs}>
         {buttons}
       </nav>
 
       <div className="menu-pdf">
         {Array.from({ length: PAGE_COUNT }, (_, index) => index + 1).map((page) => (
-          <div className="menu-pdf__page" id={`menu-page-${page}`} data-menu-page={page} key={page}>
+          <div
+            className="menu-pdf__page"
+            id={`menu-page-${page}`}
+            data-menu-page={page}
+            key={page}
+            onClick={() => openZoom(page)}
+          >
             <Image
               src={`/menu-pdf/page-${page}.jpg`}
               alt={`${labels.page} ${page}`}
@@ -107,6 +120,18 @@ export default function MenuPdf({
           {labels.open}
         </a>
       </div>
+
+      {zoomPage !== null && (
+        <div className="menu-zoom" role="dialog" aria-modal="true" aria-label={`${labels.page} ${zoomPage}`}>
+          <button className="menu-zoom__close" type="button" onClick={() => setZoomPage(null)} aria-label={labels.close}>
+            ×
+          </button>
+          <div className="menu-zoom__scroll">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/menu-pdf/page-${zoomPage}.jpg`} alt={`${labels.page} ${zoomPage}`} />
+          </div>
+        </div>
+      )}
     </>
   );
 }

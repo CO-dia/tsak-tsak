@@ -68,6 +68,8 @@ export default async function MenuPage({ params }: PageProps<"/[lang]/menu">) {
               tabs: t.tabsLabel,
               open: lang === "en" ? "Open the PDF menu" : "Ouvrir le menu en PDF",
               page: lang === "en" ? "Menu page" : "Page du menu",
+              close: lang === "en" ? "Close" : "Fermer",
+              nav: lang === "en" ? "Sections" : "Sections",
             }}
           />
         ) : (
