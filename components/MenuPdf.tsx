@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const PAGE_COUNT = 8;
 
@@ -24,6 +24,19 @@ export default function MenuPdf({
   labels: { tabs: string; open: string; page: string };
 }) {
   const [current, setCurrent] = useState(1);
+  const [railVisible, setRailVisible] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Le menu latéral apparaît dès que la barre du haut sort de l’écran.
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const observer = new IntersectionObserver(([entry]) => setRailVisible(!entry.isIntersecting), {
+      rootMargin: "-90px 0px 0px 0px",
+    });
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
   // Met en avant le bouton de la section dont la page est à l’écran.
   useEffect(() => {
@@ -50,22 +63,32 @@ export default function MenuPdf({
     document.getElementById(`menu-page-${page}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const buttons = entries.map((entry) => (
+    <button
+      className={entry.id === activeId ? "menu-tab menu-tab--active" : "menu-tab"}
+      type="button"
+      key={entry.id}
+      onClick={() => go(entry.page)}
+    >
+      {entry.label}
+    </button>
+  ));
+
   return (
     <>
-      <div className="menu-tabs">
+      <div className="menu-tabs menu-tabs--pdf" ref={barRef}>
         <div className="menu-tabs__scroll" role="navigation" aria-label={labels.tabs}>
-          {entries.map((entry) => (
-            <button
-              className={entry.id === activeId ? "menu-tab menu-tab--active" : "menu-tab"}
-              type="button"
-              key={entry.id}
-              onClick={() => go(entry.page)}
-            >
-              {entry.label}
-            </button>
-          ))}
+          {buttons}
         </div>
       </div>
+
+      <nav
+        className={railVisible ? "menu-rail menu-rail--visible" : "menu-rail"}
+        aria-label={labels.tabs}
+        aria-hidden={!railVisible}
+      >
+        {buttons}
+      </nav>
 
       <div className="menu-pdf">
         {Array.from({ length: PAGE_COUNT }, (_, index) => index + 1).map((page) => (
