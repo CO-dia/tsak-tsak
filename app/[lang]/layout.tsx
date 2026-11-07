@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
+import Script from "next/script";
 import { Suspense } from "react";
 
 import Footer from "@/components/Footer";
@@ -56,6 +57,9 @@ export default async function SiteLayout({ children, params }: LayoutProps<"/[la
           <main id="contenu">{children}</main>
           <Footer lang={lang} />
         </div>
+        {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
+          <Script defer src="https://stats.codia.si/script.js" data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID} strategy="afterInteractive" />
+        )}
       </body>
     </html>
   );
